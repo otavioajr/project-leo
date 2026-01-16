@@ -13,13 +13,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Compass, ListChecks, User, Mail, Phone } from "lucide-react";
+import { Compass, ListChecks, User, Mail, Phone, Users } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default async function AdminDashboard() {
   const adventures = await getAdventures();
   const registrations = await getRegistrations();
+  
+  const totalParticipants = registrations.reduce((acc, reg) => acc + reg.groupSize, 0);
 
   const recentRegistrations = registrations.slice(0, 5);
 
@@ -43,14 +45,14 @@ export default async function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Total de Inscrições
+              Total de Participantes
             </CardTitle>
             <ListChecks className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{registrations.length}</div>
+            <div className="text-2xl font-bold">{totalParticipants}</div>
             <p className="text-xs text-muted-foreground">
-              em todas as aventuras
+              em {registrations.length} inscrições
             </p>
           </CardContent>
         </Card>
@@ -77,6 +79,7 @@ export default async function AdminDashboard() {
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="font-medium flex items-center gap-2"><User className="h-3 w-3" />{reg.name}</span>
+                        <span className="text-sm text-muted-foreground flex items-center gap-2"><Users className="h-3 w-3" />{reg.groupSize} {reg.groupSize > 1 ? 'pessoas' : 'pessoa'}</span>
                         <span className="text-sm text-muted-foreground flex items-center gap-2"><Mail className="h-3 w-3" />{reg.email}</span>
                         <span className="text-sm text-muted-foreground flex items-center gap-2"><Phone className="h-3 w-3" />{reg.phone}</span>
                       </div>

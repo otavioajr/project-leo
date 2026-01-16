@@ -21,6 +21,7 @@ const registrationSchema = z.object({
   name: z.string().min(2, "O nome deve ter pelo menos 2 caracteres."),
   email: z.string().email("Por favor, insira um endereço de e-mail válido."),
   phone: z.string().min(10, "Por favor, insira um número de telefone válido."),
+  groupSize: z.coerce.number().min(1, "O grupo deve ter pelo menos 1 pessoa."),
 });
 
 type RegistrationFormValues = z.infer<typeof registrationSchema>;
@@ -39,6 +40,7 @@ export function RegistrationForm({ adventureId, adventureTitle }: RegistrationFo
       name: "",
       email: "",
       phone: "",
+      groupSize: 1,
     },
   });
 
@@ -71,10 +73,23 @@ export function RegistrationForm({ adventureId, adventureTitle }: RegistrationFo
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
+          name="groupSize"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Tamanho do Grupo</FormLabel>
+              <FormControl>
+                <Input type="number" min="1" placeholder="1" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nome Completo</FormLabel>
+              <FormLabel>Nome Completo do Contato Principal</FormLabel>
               <FormControl>
                 <Input placeholder="João Ninguém" {...field} />
               </FormControl>
@@ -87,7 +102,7 @@ export function RegistrationForm({ adventureId, adventureTitle }: RegistrationFo
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Endereço de E-mail</FormLabel>
+              <FormLabel>Endereço de E-mail de Contato</FormLabel>
               <FormControl>
                 <Input placeholder="voce@exemplo.com" {...field} />
               </FormControl>
@@ -100,7 +115,7 @@ export function RegistrationForm({ adventureId, adventureTitle }: RegistrationFo
           name="phone"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Número de Telefone</FormLabel>
+              <FormLabel>Telefone de Contato</FormLabel>
               <FormControl>
                 <Input placeholder="(99) 99999-9999" {...field} />
               </FormControl>

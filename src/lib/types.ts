@@ -20,4 +20,5 @@ export type Registration = {
     email: string;
     phone: string;
     registrationDate: string;
+    groupSize: number;
 };

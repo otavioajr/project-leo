@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { User, Mail, Phone } from "lucide-react";
+import { User, Mail, Phone, Users } from "lucide-react";
 
 export default async function RegistrationsPage() {
   const registrations = await getRegistrations();
@@ -35,6 +35,7 @@ export default async function RegistrationsPage() {
             <TableRow>
               <TableHead>Aventura</TableHead>
               <TableHead>Inscrito</TableHead>
+              <TableHead>Grupo</TableHead>
               <TableHead>Contato</TableHead>
               <TableHead>Data</TableHead>
             </TableRow>
@@ -47,6 +48,10 @@ export default async function RegistrationsPage() {
                   <TableCell className="font-medium flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
                     {reg.name}
+                  </TableCell>
+                  <TableCell className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    {reg.groupSize}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
@@ -65,7 +70,7 @@ export default async function RegistrationsPage() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={4} className="text-center">
+                <TableCell colSpan={5} className="text-center">
                   Nenhuma inscrição encontrada.
                 </TableCell>
               </TableRow>

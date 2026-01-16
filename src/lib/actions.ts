@@ -5,9 +5,10 @@ import { addRegistration } from "./data";
 import { revalidatePath } from "next/cache";
 
 const registrationSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  phone: z.string().min(10),
+  name: z.string().min(2, "O nome deve ter pelo menos 2 caracteres."),
+  email: z.string().email("Por favor, insira um endereço de e-mail válido."),
+  phone: z.string().min(10, "Por favor, insira um número de telefone válido."),
+  groupSize: z.coerce.number().min(1, "O grupo deve ter pelo menos 1 pessoa."),
   adventureId: z.string(),
   adventureTitle: z.string(),
 });
@@ -22,6 +23,7 @@ export async function registerForAdventure(data: unknown) {
   try {
     await addRegistration(parsed.data);
     revalidatePath("/admin/registrations");
+    revalidatePath("/admin");
     return { success: true };
   } catch (error) {
     console.error("Registration failed:", error);
