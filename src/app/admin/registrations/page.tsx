@@ -34,10 +34,9 @@ export default async function RegistrationsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Aventura</TableHead>
-              <TableHead>Inscrito</TableHead>
-              <TableHead>Grupo</TableHead>
+              <TableHead>Participantes</TableHead>
               <TableHead>Contato</TableHead>
-              <TableHead>Data</TableHead>
+              <TableHead>Data da Inscrição</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -45,13 +44,17 @@ export default async function RegistrationsPage() {
               registrations.map((reg) => (
                 <TableRow key={reg.id}>
                   <TableCell className="font-medium">{reg.adventureTitle}</TableCell>
-                  <TableCell className="font-medium flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    {reg.name}
-                  </TableCell>
-                  <TableCell className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    {reg.groupSize}
+                  <TableCell>
+                    <div className="font-medium flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        Grupo de {reg.groupSize}
+                    </div>
+                    <ul className="pl-6 mt-1 space-y-1 text-sm text-muted-foreground">
+                        <li className="flex items-center gap-2 font-semibold text-foreground"><User className="h-4 w-4" />{reg.name} <span className="text-xs text-muted-foreground">(Contato)</span></li>
+                        {reg.participants?.map((p, i) => (
+                            <li key={i} className="flex items-center gap-2"><User className="h-4 w-4 opacity-70" />{p.name}</li>
+                        ))}
+                    </ul>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
@@ -70,7 +73,7 @@ export default async function RegistrationsPage() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="text-center">
+                <TableCell colSpan={4} className="text-center">
                   Nenhuma inscrição encontrada.
                 </TableCell>
               </TableRow>

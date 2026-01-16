@@ -78,6 +78,7 @@ let registrations: Map<string, Registration> = new Map([
         phone: '123-456-7890',
         registrationDate: new Date('2023-10-15T10:00:00Z').toISOString(),
         groupSize: 1,
+        participants: [],
     }],
     ['2', {
         id: '2',
@@ -88,6 +89,7 @@ let registrations: Map<string, Registration> = new Map([
         phone: '098-765-4321',
         registrationDate: new Date('2023-10-16T11:30:00Z').toISOString(),
         groupSize: 2,
+        participants: [{ name: 'Pedro da Silva' }],
     }]
 ]);
 

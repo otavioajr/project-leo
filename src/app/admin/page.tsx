@@ -77,9 +77,16 @@ export default async function AdminDashboard() {
                   <TableRow key={reg.id}>
                     <TableCell className="font-medium">{reg.adventureTitle}</TableCell>
                     <TableCell>
-                      <div className="flex flex-col">
+                      <div className="flex flex-col gap-1">
                         <span className="font-medium flex items-center gap-2"><User className="h-3 w-3" />{reg.name}</span>
                         <span className="text-sm text-muted-foreground flex items-center gap-2"><Users className="h-3 w-3" />{reg.groupSize} {reg.groupSize > 1 ? 'pessoas' : 'pessoa'}</span>
+                        {reg.participants && reg.participants.length > 0 && (
+                            <div className="pl-5 py-1 text-sm text-muted-foreground border-l border-dashed ml-1.5 space-y-1">
+                                {reg.participants.map((p, i) => (
+                                    <div key={i} className="flex items-center gap-2"><User className="h-3 w-3 opacity-70" />{p.name}</div>
+                                ))}
+                            </div>
+                        )}
                         <span className="text-sm text-muted-foreground flex items-center gap-2"><Mail className="h-3 w-3" />{reg.email}</span>
                         <span className="text-sm text-muted-foreground flex items-center gap-2"><Phone className="h-3 w-3" />{reg.phone}</span>
                       </div>

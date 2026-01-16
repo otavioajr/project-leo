@@ -21,4 +21,5 @@ export type Registration = {
     phone: string;
     registrationDate: string;
     groupSize: number;
+    participants?: { name: string }[];
 };
