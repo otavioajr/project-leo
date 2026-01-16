@@ -1,3 +1,46 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-1",
+      "description": "A stunning mountain range at sunrise, with a lone hiker looking out over the valley.",
+      "imageUrl": "https://images.unsplash.com/photo-1742578880683-806bb8a2a90e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxhZHZlbnR1cmUlMjBsYW5kc2NhcGV8ZW58MHx8fHwxNzY4NTY0NjM1fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "adventure landscape"
+    },
+    {
+      "id": "adventure-1",
+      "description": "A group of hikers on a trail in a lush, green forest.",
+      "imageUrl": "https://images.unsplash.com/photo-1633421459525-f224f11f5b33?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxoaWtpbmclMjBtb3VudGFpbnxlbnwwfHx8fDE3Njg1NjQ2MzZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "hiking mountain"
+    },
+    {
+      "id": "adventure-2",
+      "description": "Two people kayaking on a calm, clear lake surrounded by mountains.",
+      "imageUrl": "https://images.unsplash.com/photo-1669659738635-7af645bb8a5b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxrYXlha2luZyUyMGxha2V8ZW58MHx8fHwxNzY4NTY0NjM2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "kayaking lake"
+    },
+    {
+      "id": "adventure-3",
+      "description": "A person rock climbing a steep cliff face with safety gear.",
+      "imageUrl": "https://images.unsplash.com/photo-1522163182402-834f871fd851?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxyb2NrJTIwY2xpbWJpbmd8ZW58MHx8fHwxNzY4NTY0NjM1fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "rock climbing"
+    },
+    {
+      "id": "adventure-4",
+      "description": "A mountain biker riding down a dirt path in a forest.",
+      "imageUrl": "https://images.unsplash.com/photo-1511994298241-608e28f14fde?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxtb3VudGFpbiUyMGJpa2luZ3xlbnwwfHx8fDE3Njg1NjQ2MzV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "mountain biking"
+    },
+    {
+      "id": "adventure-5",
+      "description": "A person paragliding over a scenic valley.",
+      "imageUrl": "https://images.unsplash.com/photo-1589126563963-5f5bf75838fa?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxwYXJhZ2xpZGluZyUyMHZhbGxleXxlbnwwfHx8fDE3Njg1NjQ2MzZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "paragliding valley"
+    },
+    {
+      "id": "adventure-6",
+      "description": "Rafters navigating white water rapids on a river.",
+      "imageUrl": "https://images.unsplash.com/photo-1641584511182-094468c129ed?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHx3aGl0ZSUyMHdhdGVyJTIwcmFmdGluZ3xlbnwwfHx8fDE3Njg1NjQ2MzV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "white water rafting"
+    }
+  ]
 }
