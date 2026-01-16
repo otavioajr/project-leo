@@ -24,9 +24,9 @@ export default async function AdventurePage({ params }: AdventurePageProps) {
   const image = PlaceHolderImages.find((img) => img.id === adventure.imageId);
 
   const difficultyVariant = {
-    Easy: 'default',
-    Moderate: 'secondary',
-    Challenging: 'destructive',
+    'Fácil': 'default',
+    'Moderado': 'secondary',
+    'Desafiador': 'destructive',
   } as const;
 
   return (
@@ -55,13 +55,13 @@ export default async function AdventurePage({ params }: AdventurePageProps) {
           <div className="sticky top-24">
             <Card className="mb-6">
               <CardHeader>
-                <CardTitle className="font-headline flex items-center gap-2"><Info />Key Details</CardTitle>
+                <CardTitle className="font-headline flex items-center gap-2"><Info />Detalhes Principais</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                  <div className="flex items-center gap-3">
                     <DollarSign className="h-5 w-5 text-primary" />
-                    <span className="font-semibold text-lg">${adventure.price.toFixed(2)}</span>
-                    <span className="text-muted-foreground">per person</span>
+                    <span className="font-semibold text-lg">R${adventure.price.toFixed(2)}</span>
+                    <span className="text-muted-foreground">por pessoa</span>
                   </div>
                 <div className="flex items-center gap-3">
                   <Timer className="h-5 w-5 text-primary" />
@@ -83,7 +83,7 @@ export default async function AdventurePage({ params }: AdventurePageProps) {
             {adventure.registrationsEnabled ? (
               <Card>
                 <CardHeader>
-                  <CardTitle className="font-headline">Book Your Spot</CardTitle>
+                  <CardTitle className="font-headline">Reserve Seu Lugar</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <RegistrationForm adventureId={adventure.id} adventureTitle={adventure.title} />
@@ -92,10 +92,10 @@ export default async function AdventurePage({ params }: AdventurePageProps) {
             ) : (
               <Card className="bg-muted">
                 <CardHeader>
-                  <CardTitle className="font-headline text-muted-foreground">Registration Closed</CardTitle>
+                  <CardTitle className="font-headline text-muted-foreground">Inscrições Encerradas</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">Registration for this adventure is currently closed. Please check back later or explore our other adventures!</p>
+                  <p className="text-muted-foreground">As inscrições para esta aventura estão atualmente encerradas. Por favor, volte mais tarde ou explore nossas outras aventuras!</p>
                 </CardContent>
               </Card>
             )}

@@ -17,9 +17,9 @@ import { Mountain, LayoutDashboard, Compass, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/adventures", label: "Adventures", icon: Compass },
-  { href: "/admin/registrations", label: "Registrations", icon: ListChecks },
+  { href: "/admin", label: "Painel", icon: LayoutDashboard },
+  { href: "/admin/adventures", label: "Aventuras", icon: Compass },
+  { href: "/admin/registrations", label: "Inscrições", icon: ListChecks },
 ];
 
 export default function AdminLayout({
@@ -39,7 +39,7 @@ export default function AdminLayout({
                 <Mountain className="h-6 w-6 text-primary" />
               </Link>
             </Button>
-            <h2 className="text-lg font-headline font-semibold">Admin Panel</h2>
+            <h2 className="text-lg font-headline font-semibold">Painel de Administração</h2>
           </div>
         </SidebarHeader>
         <SidebarContent>
@@ -65,7 +65,7 @@ export default function AdminLayout({
         <header className="flex h-16 items-center gap-4 border-b bg-background px-6">
           <SidebarTrigger />
           <h1 className="text-lg font-semibold md:text-xl font-headline">
-            {navItems.find(item => pathname.startsWith(item.href))?.label || "Dashboard"}
+            {navItems.find(item => pathname.startsWith(item.href))?.label || "Painel"}
           </h1>
         </header>
         <main className="flex-1 p-6">{children}</main>

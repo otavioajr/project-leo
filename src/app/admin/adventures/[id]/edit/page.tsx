@@ -17,9 +17,9 @@ export default async function EditAdventurePage({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Edit Adventure</CardTitle>
+        <CardTitle>Editar Aventura</CardTitle>
         <CardDescription>
-          Update the details for "{adventure.title}".
+          Atualize os detalhes para "{adventure.title}".
         </CardDescription>
       </CardHeader>
       <CardContent>

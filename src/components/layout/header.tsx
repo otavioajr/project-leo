@@ -13,10 +13,10 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
-  { href: "/", label: "Home" },
-  { href: "/#adventures", label: "Adventures" },
-  { href: "/about", label: "About" },
-  { href: "/contact", label: "Contact" },
+  { href: "/", label: "Início" },
+  { href: "/#adventures", label: "Aventuras" },
+  { href: "/about", label: "Sobre" },
+  { href: "/contact", label: "Contato" },
 ];
 
 export function Header() {
@@ -59,7 +59,7 @@ export function Header() {
       <div className="container flex h-16 items-center">
         <Link href="/" className="mr-6 flex items-center gap-2">
           <Mountain className="h-6 w-6 text-primary" />
-          <span className="font-bold text-lg font-headline">Alpina Adventures</span>
+          <span className="font-bold text-lg font-headline">Alpina Aventuras</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
@@ -72,21 +72,21 @@ export function Header() {
           <Button variant="ghost" size="icon" asChild>
             <Link href="/admin">
               <UserCircle className="h-5 w-5" />
-              <span className="sr-only">Admin Dashboard</span>
+              <span className="sr-only">Painel Administrativo</span>
             </Link>
           </Button>
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="md:hidden">
                 <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle navigation menu</span>
+                <span className="sr-only">Alternar menu de navegação</span>
               </Button>
             </SheetTrigger>
             <SheetContent side="right">
               <div className="flex flex-col gap-4 py-8">
                 <Link href="/" className="mb-4 flex items-center gap-2 px-4">
                   <Mountain className="h-6 w-6 text-primary" />
-                  <span className="font-bold">Alpina Adventures</span>
+                  <span className="font-bold">Alpina Aventuras</span>
                 </Link>
                 <nav className="flex flex-col gap-2">
                   {navLinks.map((link) => (

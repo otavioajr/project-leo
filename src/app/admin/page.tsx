@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Compass, ListChecks, User, Mail, Phone } from "lucide-react";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default async function AdminDashboard() {
   const adventures = await getAdventures();
@@ -28,28 +29,28 @@ export default async function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Total Adventures
+              Total de Aventuras
             </CardTitle>
             <Compass className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{adventures.length}</div>
             <p className="text-xs text-muted-foreground">
-              active and draft adventures
+              aventuras ativas e rascunhos
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Total Registrations
+              Total de Inscrições
             </CardTitle>
             <ListChecks className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{registrations.length}</div>
             <p className="text-xs text-muted-foreground">
-              across all adventures
+              em todas as aventuras
             </p>
           </CardContent>
         </Card>
@@ -57,15 +58,15 @@ export default async function AdminDashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent Registrations</CardTitle>
+          <CardTitle>Inscrições Recentes</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Adventure</TableHead>
-                <TableHead>Registrant</TableHead>
-                <TableHead>Date</TableHead>
+                <TableHead>Aventura</TableHead>
+                <TableHead>Inscrito</TableHead>
+                <TableHead>Data</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -81,14 +82,14 @@ export default async function AdminDashboard() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {format(new Date(reg.registrationDate), "PPP p")}
+                      {format(new Date(reg.registrationDate), "PPP p", { locale: ptBR })}
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center">
-                    No registrations yet.
+                    Nenhuma inscrição ainda.
                   </TableCell>
                 </TableRow>
               )}

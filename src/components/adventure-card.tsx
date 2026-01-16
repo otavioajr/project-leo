@@ -21,9 +21,9 @@ export function AdventureCard({ adventure }: AdventureCardProps) {
   const image = PlaceHolderImages.find((img) => img.id === adventure.imageId);
 
   const difficultyVariant = {
-    Easy: 'default',
-    Moderate: 'secondary',
-    Challenging: 'destructive',
+    'Fácil': 'default',
+    'Moderado': 'secondary',
+    'Desafiador': 'destructive',
   } as const;
 
   return (
@@ -75,7 +75,7 @@ export function AdventureCard({ adventure }: AdventureCardProps) {
       <CardFooter className="p-6 pt-0">
         <Button asChild className="w-full" variant="outline">
           <Link href={`/adventures/${adventure.slug}`}>
-            Learn More <ArrowRight className="ml-2 h-4 w-4" />
+            Saiba Mais <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </Button>
       </CardFooter>

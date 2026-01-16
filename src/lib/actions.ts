@@ -16,7 +16,7 @@ export async function registerForAdventure(data: unknown) {
   const parsed = registrationSchema.safeParse(data);
 
   if (!parsed.success) {
-    return { success: false, message: "Invalid data provided." };
+    return { success: false, message: "Dados inválidos fornecidos." };
   }
 
   try {
@@ -25,6 +25,6 @@ export async function registerForAdventure(data: unknown) {
     return { success: true };
   } catch (error) {
     console.error("Registration failed:", error);
-    return { success: false, message: "Could not complete registration." };
+    return { success: false, message: "Não foi possível concluir a inscrição." };
   }
 }

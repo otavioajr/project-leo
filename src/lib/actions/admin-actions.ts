@@ -12,7 +12,7 @@ const adventureSchema = z.object({
   price: z.coerce.number().min(0),
   duration: z.string().min(1),
   location: z.string().min(1),
-  difficulty: z.enum(["Easy", "Moderate", "Challenging"]),
+  difficulty: z.enum(["Fácil", "Moderado", "Desafiador"]),
   imageId: z.string().min(1),
   registrationsEnabled: z.boolean(),
 });
@@ -21,7 +21,7 @@ export async function saveAdventure(data: unknown) {
   const parsed = adventureSchema.safeParse(data);
 
   if (!parsed.success) {
-    return { success: false, message: "Invalid adventure data provided.", errors: parsed.error.issues };
+    return { success: false, message: "Dados de aventura inválidos fornecidos.", errors: parsed.error.issues };
   }
 
   try {
@@ -32,13 +32,13 @@ export async function saveAdventure(data: unknown) {
     return { success: true, adventure: savedAdventure };
   } catch (error) {
     console.error("Failed to save adventure:", error);
-    return { success: false, message: "Could not save the adventure." };
+    return { success: false, message: "Não foi possível salvar a aventura." };
   }
 }
 
 export async function deleteAdventure(id: string) {
   if (!id) {
-    return { success: false, message: "Adventure ID is required." };
+    return { success: false, message: "O ID da aventura é obrigatório." };
   }
 
   try {
@@ -48,6 +48,6 @@ export async function deleteAdventure(id: string) {
     return { success: true };
   } catch (error) {
     console.error("Failed to delete adventure:", error);
-    return { success: false, message: "Could not delete the adventure." };
+    return { success: false, message: "Não foi possível excluir a aventura." };
   }
 }

@@ -34,16 +34,16 @@ export default async function AdventuresPage() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Adventures</CardTitle>
+            <CardTitle>Aventuras</CardTitle>
             <CardDescription>
-              Manage your adventure listings and view their details.
+              Gerencie suas listas de aventuras e veja seus detalhes.
             </CardDescription>
           </div>
           <Button asChild size="sm" className="gap-1">
             <Link href="/admin/adventures/new">
               <PlusCircle className="h-3.5 w-3.5" />
               <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Create Adventure
+                Criar Aventura
               </span>
             </Link>
           </Button>
@@ -53,12 +53,12 @@ export default async function AdventuresPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Title</TableHead>
+              <TableHead>Título</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead>Location</TableHead>
+              <TableHead>Preço</TableHead>
+              <TableHead>Localização</TableHead>
               <TableHead>
-                <span className="sr-only">Actions</span>
+                <span className="sr-only">Ações</span>
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -69,10 +69,10 @@ export default async function AdventuresPage() {
                   <TableCell className="font-medium">{adventure.title}</TableCell>
                   <TableCell>
                     <Badge variant={adventure.registrationsEnabled ? "default" : "outline"}>
-                      {adventure.registrationsEnabled ? "Open" : "Closed"}
+                      {adventure.registrationsEnabled ? "Abertas" : "Fechadas"}
                     </Badge>
                   </TableCell>
-                  <TableCell>${adventure.price.toFixed(2)}</TableCell>
+                  <TableCell>R${adventure.price.toFixed(2)}</TableCell>
                   <TableCell>{adventure.location}</TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -83,12 +83,12 @@ export default async function AdventuresPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
                         <DropdownMenuItem asChild>
-                           <Link href={`/admin/adventures/${adventure.id}/edit`}>Edit</Link>
+                           <Link href={`/admin/adventures/${adventure.id}/edit`}>Editar</Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                           <Link href={`/adventures/${adventure.slug}`} target="_blank">View</Link>
+                           <Link href={`/adventures/${adventure.slug}`} target="_blank">Ver</Link>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -98,7 +98,7 @@ export default async function AdventuresPage() {
             ) : (
               <TableRow>
                 <TableCell colSpan={5} className="text-center">
-                  No adventures found.
+                  Nenhuma aventura encontrada.
                 </TableCell>
               </TableRow>
             )}

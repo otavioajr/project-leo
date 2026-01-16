@@ -5,9 +5,9 @@ export default function NewAdventurePage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Create New Adventure</CardTitle>
+        <CardTitle>Criar Nova Aventura</CardTitle>
         <CardDescription>
-          Fill out the form below to add a new adventure to your website.
+          Preencha o formulário abaixo para adicionar uma nova aventura ao seu site.
         </CardDescription>
       </CardHeader>
       <CardContent>

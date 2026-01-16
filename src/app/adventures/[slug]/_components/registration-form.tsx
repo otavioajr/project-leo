@@ -18,9 +18,9 @@ import { registerForAdventure } from "@/lib/actions";
 import { useState } from "react";
 
 const registrationSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters."),
-  email: z.string().email("Please enter a valid email address."),
-  phone: z.string().min(10, "Please enter a valid phone number."),
+  name: z.string().min(2, "O nome deve ter pelo menos 2 caracteres."),
+  email: z.string().email("Por favor, insira um endereço de e-mail válido."),
+  phone: z.string().min(10, "Por favor, insira um número de telefone válido."),
 });
 
 type RegistrationFormValues = z.infer<typeof registrationSchema>;
@@ -52,14 +52,14 @@ export function RegistrationForm({ adventureId, adventureTitle }: RegistrationFo
 
     if (result.success) {
       toast({
-        title: "Registration Successful!",
-        description: "We've received your registration. See you on the trail!",
+        title: "Inscrição Realizada com Sucesso!",
+        description: "Recebemos sua inscrição. Nos vemos na trilha!",
       });
       form.reset();
     } else {
       toast({
-        title: "Registration Failed",
-        description: result.message || "Something went wrong. Please try again.",
+        title: "Falha na Inscrição",
+        description: result.message || "Algo deu errado. Por favor, tente novamente.",
         variant: "destructive",
       });
     }
@@ -74,9 +74,9 @@ export function RegistrationForm({ adventureId, adventureTitle }: RegistrationFo
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Full Name</FormLabel>
+              <FormLabel>Nome Completo</FormLabel>
               <FormControl>
-                <Input placeholder="John Doe" {...field} />
+                <Input placeholder="João Ninguém" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -87,9 +87,9 @@ export function RegistrationForm({ adventureId, adventureTitle }: RegistrationFo
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email Address</FormLabel>
+              <FormLabel>Endereço de E-mail</FormLabel>
               <FormControl>
-                <Input placeholder="you@example.com" {...field} />
+                <Input placeholder="voce@exemplo.com" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -100,16 +100,16 @@ export function RegistrationForm({ adventureId, adventureTitle }: RegistrationFo
           name="phone"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Phone Number</FormLabel>
+              <FormLabel>Número de Telefone</FormLabel>
               <FormControl>
-                <Input placeholder="(123) 456-7890" {...field} />
+                <Input placeholder="(99) 99999-9999" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
         <Button type="submit" className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground" disabled={isSubmitting}>
-          {isSubmitting ? "Submitting..." : "Register Now"}
+          {isSubmitting ? "Enviando..." : "Inscreva-se Agora"}
         </Button>
       </form>
     </Form>

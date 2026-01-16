@@ -45,14 +45,14 @@ import {
 } from "@/components/ui/alert-dialog"
 
 const adventureSchema = z.object({
-  title: z.string().min(3, "Title must be at least 3 characters."),
-  description: z.string().min(10, "Short description must be at least 10 characters.").max(150, "Short description must be less than 150 characters."),
-  longDescription: z.string().min(20, "Long description must be at least 20 characters."),
-  price: z.coerce.number().min(0, "Price must be a positive number."),
-  duration: z.string().min(1, "Duration is required."),
-  location: z.string().min(1, "Location is required."),
-  difficulty: z.enum(["Easy", "Moderate", "Challenging"]),
-  imageId: z.string().min(1, "Image ID is required."),
+  title: z.string().min(3, "O título deve ter pelo menos 3 caracteres."),
+  description: z.string().min(10, "A descrição curta deve ter pelo menos 10 caracteres.").max(150, "A descrição curta deve ter menos de 150 caracteres."),
+  longDescription: z.string().min(20, "A descrição longa deve ter pelo menos 20 caracteres."),
+  price: z.coerce.number().min(0, "O preço deve ser um número positivo."),
+  duration: z.string().min(1, "A duração é obrigatória."),
+  location: z.string().min(1, "A localização é obrigatória."),
+  difficulty: z.enum(["Fácil", "Moderado", "Desafiador"]),
+  imageId: z.string().min(1, "O ID da imagem é obrigatório."),
   registrationsEnabled: z.boolean(),
 });
 
@@ -77,7 +77,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       price: adventure?.price || 0,
       duration: adventure?.duration || "",
       location: adventure?.location || "",
-      difficulty: adventure?.difficulty || "Moderate",
+      difficulty: adventure?.difficulty || "Moderado",
       imageId: adventure?.imageId || "adventure-1",
       registrationsEnabled: adventure?.registrationsEnabled ?? true,
     },
@@ -89,15 +89,15 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
 
     if (result.success && result.adventure) {
       toast({
-        title: adventure ? "Adventure Updated" : "Adventure Created",
-        description: `"${result.adventure.title}" has been saved.`,
+        title: adventure ? "Aventura Atualizada" : "Aventura Criada",
+        description: `"${result.adventure.title}" foi salva.`,
       });
       router.push("/admin/adventures");
       router.refresh();
     } else {
       toast({
-        title: "Save Failed",
-        description: result.message || "Something went wrong.",
+        title: "Falha ao Salvar",
+        description: result.message || "Algo deu errado.",
         variant: "destructive",
       });
     }
@@ -110,15 +110,15 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
     const result = await deleteAdventure(adventure.id);
     if(result.success) {
         toast({
-            title: "Adventure Deleted",
-            description: `"${adventure.title}" has been removed.`,
+            title: "Aventura Excluída",
+            description: `"${adventure.title}" foi removida.`,
         });
         router.push("/admin/adventures");
         router.refresh();
     } else {
         toast({
-            title: "Deletion Failed",
-            description: "Something went wrong.",
+            title: "Falha na Exclusão",
+            description: "Algo deu errado.",
             variant: "destructive",
         });
         setIsDeleting(false);
@@ -135,9 +135,9 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Title</FormLabel>
+                  <FormLabel>Título</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Mountain Ridge Hike" {...field} />
+                    <Input placeholder="ex: Caminhada na Crista da Montanha" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -148,9 +148,9 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Short Description</FormLabel>
+                  <FormLabel>Descrição Curta</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="A brief, catchy description for the adventure card." {...field} />
+                    <Textarea placeholder="Uma descrição breve e cativante para o cartão da aventura." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -161,9 +161,9 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
               name="longDescription"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Full Description</FormLabel>
+                  <FormLabel>Descrição Completa</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="A detailed description for the adventure page." rows={6} {...field} />
+                    <Textarea placeholder="Uma descrição detalhada para a página da aventura." rows={6} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -176,7 +176,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
               name="price"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Price ($)</FormLabel>
+                  <FormLabel>Preço (R$)</FormLabel>
                   <FormControl>
                     <Input type="number" step="0.01" {...field} />
                   </FormControl>
@@ -189,9 +189,9 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
               name="duration"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Duration</FormLabel>
+                  <FormLabel>Duração</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Full Day, 3 Hours" {...field} />
+                    <Input placeholder="ex: Dia Inteiro, 3 Horas" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -202,9 +202,9 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
               name="location"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Location</FormLabel>
+                  <FormLabel>Localização</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Alpine Ridge" {...field} />
+                    <Input placeholder="ex: Crista Alpina" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -215,17 +215,17 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
               name="difficulty"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Difficulty</FormLabel>
+                  <FormLabel>Dificuldade</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select difficulty" />
+                        <SelectValue placeholder="Selecione a dificuldade" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="Easy">Easy</SelectItem>
-                      <SelectItem value="Moderate">Moderate</SelectItem>
-                      <SelectItem value="Challenging">Challenging</SelectItem>
+                      <SelectItem value="Fácil">Fácil</SelectItem>
+                      <SelectItem value="Moderado">Moderado</SelectItem>
+                      <SelectItem value="Desafiador">Desafiador</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -237,11 +237,11 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
               name="imageId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Image ID</FormLabel>
+                  <FormLabel>ID da Imagem</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., adventure-1" {...field} />
+                    <Input placeholder="ex: aventura-1" {...field} />
                   </FormControl>
-                   <FormDescription>From placeholder-images.json</FormDescription>
+                   <FormDescription>De placeholder-images.json</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -252,9 +252,9 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                 render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
-                        <FormLabel>Enable Registrations</FormLabel>
+                        <FormLabel>Habilitar Inscrições</FormLabel>
                         <FormDescription>
-                        Allow users to register for this adventure.
+                        Permitir que os usuários se inscrevam nesta aventura.
                         </FormDescription>
                     </div>
                     <FormControl>
@@ -275,21 +275,21 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                     <AlertDialogTrigger asChild>
                     <Button type="button" variant="destructive" disabled={isDeleting}>
                         <Trash className="mr-2 h-4 w-4" />
-                        {isDeleting ? "Deleting..." : "Delete"}
+                        {isDeleting ? "Excluindo..." : "Excluir"}
                     </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                         <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the
-                        adventure and all associated registrations.
+                        Esta ação não pode ser desfeita. Isso excluirá permanentemente a
+                        aventura e todas as inscrições associadas.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-                        Continue
+                        Continuar
                         </AlertDialogAction>
                     </AlertDialogFooter>
                     </AlertDialogContent>
@@ -297,7 +297,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
              )}
             </div>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Saving..." : "Save Changes"}
+            {isSubmitting ? "Salvando..." : "Salvar Alterações"}
           </Button>
         </div>
       </form>

@@ -7,7 +7,7 @@ export type Adventure = {
   price: number;
   duration: string;
   location: string;
-  difficulty: 'Easy' | 'Moderate' | 'Challenging';
+  difficulty: 'Fácil' | 'Moderado' | 'Desafiador';
   imageId: string;
   registrationsEnabled: boolean;
 };

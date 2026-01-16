@@ -26,14 +26,14 @@ export default async function Home() {
         <div className="absolute inset-0 bg-black/50" />
         <div className="relative z-10 flex h-full flex-col items-center justify-center text-center text-white p-6">
           <h1 className="text-4xl md:text-6xl font-headline font-bold tracking-tight">
-            Your Next Adventure Awaits
+            Sua Próxima Aventura o Aguarda
           </h1>
           <p className="mt-4 max-w-2xl text-lg md:text-xl text-primary-foreground/80">
-            Explore breathtaking landscapes and challenge yourself with our curated outdoor experiences.
+            Explore paisagens de tirar o fôlego e desafie-se com nossas experiências ao ar livre selecionadas.
           </p>
           <Button asChild size="lg" className="mt-8 bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold">
             <Link href="#adventures">
-              Explore Activities <ArrowRight className="ml-2" />
+              Explorar Atividades <ArrowRight className="ml-2" />
             </Link>
           </Button>
         </div>
@@ -43,10 +43,10 @@ export default async function Home() {
         <div className="container mx-auto px-6">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-headline font-bold text-primary">
-              Discover Our Adventures
+              Descubra Nossas Aventuras
             </h2>
             <p className="mt-2 text-lg text-muted-foreground">
-              From serene hikes to thrilling climbs, find the perfect experience for you.
+              De caminhadas serenas a escaladas emocionantes, encontre a experiência perfeita para você.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

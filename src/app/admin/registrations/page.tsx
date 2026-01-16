@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { User, Mail, Phone } from "lucide-react";
 
 export default async function RegistrationsPage() {
@@ -23,19 +24,19 @@ export default async function RegistrationsPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>All Registrations</CardTitle>
+        <CardTitle>Todas as Inscrições</CardTitle>
         <CardDescription>
-          View all user registrations for your adventures.
+          Veja todas as inscrições de usuários para suas aventuras.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Adventure</TableHead>
-              <TableHead>Registrant</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Date</TableHead>
+              <TableHead>Aventura</TableHead>
+              <TableHead>Inscrito</TableHead>
+              <TableHead>Contato</TableHead>
+              <TableHead>Data</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -58,14 +59,14 @@ export default async function RegistrationsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {format(new Date(reg.registrationDate), "PPP p")}
+                    {format(new Date(reg.registrationDate), "PPP p", { locale: ptBR })}
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
                 <TableCell colSpan={4} className="text-center">
-                  No registrations found.
+                  Nenhuma inscrição encontrada.
                 </TableCell>
               </TableRow>
             )}
