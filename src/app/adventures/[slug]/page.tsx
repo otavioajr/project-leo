@@ -86,7 +86,11 @@ export default async function AdventurePage({ params }: AdventurePageProps) {
                   <CardTitle className="font-headline">Reserve Seu Lugar</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <RegistrationForm adventureId={adventure.id} adventureTitle={adventure.title} />
+                  <RegistrationForm 
+                    adventureId={adventure.id} 
+                    adventureTitle={adventure.title} 
+                    customFields={adventure.customFields} 
+                  />
                 </CardContent>
               </Card>
             ) : (

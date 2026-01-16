@@ -1,7 +1,7 @@
 "use client";
 
 import { z } from "zod";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -29,8 +29,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Trash } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Trash, PlusCircle } from "lucide-react";
 
 import {
   AlertDialog,
@@ -44,6 +44,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
+const customFieldSchema = z.object({
+  name: z.string().min(1, "O nome do campo é obrigatório.").regex(/^[a-z0-9_]+$/, "Use apenas letras minúsculas, números e sublinhados (sem espaços)."),
+  label: z.string().min(1, "O rótulo é obrigatório."),
+  type: z.enum(['text', 'email', 'tel', 'number']),
+  required: z.boolean(),
+});
+
 const adventureSchema = z.object({
   title: z.string().min(3, "O título deve ter pelo menos 3 caracteres."),
   description: z.string().min(10, "A descrição curta deve ter pelo menos 10 caracteres.").max(150, "A descrição curta deve ter menos de 150 caracteres."),
@@ -54,6 +61,7 @@ const adventureSchema = z.object({
   difficulty: z.enum(["Fácil", "Moderado", "Desafiador"]),
   imageId: z.string().min(1, "O ID da imagem é obrigatório."),
   registrationsEnabled: z.boolean(),
+  customFields: z.array(customFieldSchema).optional(),
 });
 
 type AdventureFormValues = z.infer<typeof adventureSchema>;
@@ -80,7 +88,13 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       difficulty: adventure?.difficulty || "Moderado",
       imageId: adventure?.imageId || "adventure-1",
       registrationsEnabled: adventure?.registrationsEnabled ?? true,
+      customFields: adventure?.customFields || [],
     },
+  });
+  
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "customFields",
   });
 
   async function onSubmit(values: AdventureFormValues) {
@@ -268,7 +282,102 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                 />
           </div>
         </div>
-        <div className="flex justify-between items-center">
+
+        <Separator />
+        
+        <div>
+            <h3 className="text-xl font-headline font-semibold mb-4">Construtor de Formulário de Inscrição</h3>
+            <FormDescription className="mb-4">Adicione campos personalizados para coletar informações dos participantes. Estes campos aparecerão para cada participante adicional no grupo.</FormDescription>
+            <div className="space-y-6">
+                {fields.map((field, index) => (
+                    <div key={field.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-md relative">
+                         <FormField
+                            control={form.control}
+                            name={`customFields.${index}.label`}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Rótulo do Campo</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Ex: CPF" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name={`customFields.${index}.name`}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Nome do Campo (ID)</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Ex: cpf" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name={`customFields.${index}.type`}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Tipo</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Selecione o tipo" />
+                                        </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="text">Texto</SelectItem>
+                                            <SelectItem value="email">E-mail</SelectItem>
+                                            <SelectItem value="tel">Telefone</SelectItem>
+                                            <SelectItem value="number">Número</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </FormItem>
+                            )}
+                        />
+                        <div className="flex items-end gap-4">
+                            <FormField
+                                control={form.control}
+                                name={`customFields.${index}.required`}
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                        <div className="space-y-0.5 mr-4">
+                                            <FormLabel>Obrigatório</FormLabel>
+                                        </div>
+                                        <FormControl>
+                                            <Switch
+                                            checked={field.value}
+                                            onCheckedChange={field.onChange}
+                                            />
+                                        </FormControl>
+                                    </FormItem>
+                                )}
+                            />
+                            <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                                <Trash className="h-4 w-4 text-destructive" />
+                                <span className="sr-only">Remover Campo</span>
+                            </Button>
+                        </div>
+                    </div>
+                ))}
+                 <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => append({ name: "", label: "", type: "text", required: false })}
+                >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Adicionar Campo
+                </Button>
+            </div>
+        </div>
+
+        <div className="flex justify-between items-center mt-8">
             <div>
             {adventure && (
                 <AlertDialog>

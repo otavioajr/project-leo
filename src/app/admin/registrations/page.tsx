@@ -18,6 +18,11 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { User, Mail, Phone, Users } from "lucide-react";
 
+function formatFieldName(name: string) {
+    const words = name.replace(/_/g, ' ').split(' ');
+    return words.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
 export default async function RegistrationsPage() {
   const registrations = await getRegistrations();
 
@@ -49,10 +54,22 @@ export default async function RegistrationsPage() {
                         <Users className="h-4 w-4 text-muted-foreground" />
                         Grupo de {reg.groupSize}
                     </div>
-                    <ul className="pl-6 mt-1 space-y-1 text-sm text-muted-foreground">
+                    <ul className="pl-6 mt-1 space-y-2 text-sm text-muted-foreground">
                         <li className="flex items-center gap-2 font-semibold text-foreground"><User className="h-4 w-4" />{reg.name} <span className="text-xs text-muted-foreground">(Contato)</span></li>
                         {reg.participants?.map((p, i) => (
-                            <li key={i} className="flex items-center gap-2"><User className="h-4 w-4 opacity-70" />{p.name}</li>
+                           <li key={i} className="border-l pl-3 ml-2 py-1">
+                                <div className="flex items-center gap-2 font-semibold text-foreground"><User className="h-4 w-4 opacity-70" />{p.name}</div>
+                                <div className="pl-6 mt-1 space-y-1">
+                                    {Object.entries(p).map(([key, value]) => {
+                                        if (key === 'name' || !value) return null;
+                                        return (
+                                            <div key={key} className="text-xs">
+                                                <span className="font-medium">{formatFieldName(key)}:</span> {value}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </li>
                         ))}
                     </ul>
                   </TableCell>

@@ -1,3 +1,10 @@
+export type CustomField = {
+  name: string;
+  label: string;
+  type: 'text' | 'email' | 'tel' | 'number';
+  required: boolean;
+};
+
 export type Adventure = {
   id: string;
   slug: string;
@@ -10,6 +17,7 @@ export type Adventure = {
   difficulty: 'Fácil' | 'Moderado' | 'Desafiador';
   imageId: string;
   registrationsEnabled: boolean;
+  customFields?: CustomField[];
 };
 
 export type Registration = {
@@ -21,5 +29,5 @@ export type Registration = {
     phone: string;
     registrationDate: string;
     groupSize: number;
-    participants?: { name: string }[];
+    participants?: Record<string, string>[];
 };

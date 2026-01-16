@@ -16,6 +16,10 @@ let adventures: Map<string, Adventure> = new Map([
       difficulty: 'Moderado',
       imageId: 'adventure-1',
       registrationsEnabled: true,
+      customFields: [
+        { name: 'cpf', label: 'CPF', type: 'text', required: true },
+        { name: 'idade', label: 'Idade', type: 'number', required: false },
+      ],
     },
   ],
   [
@@ -32,6 +36,7 @@ let adventures: Map<string, Adventure> = new Map([
       difficulty: 'Fácil',
       imageId: 'adventure-2',
       registrationsEnabled: true,
+      customFields: [],
     },
   ],
   [
@@ -48,6 +53,7 @@ let adventures: Map<string, Adventure> = new Map([
       difficulty: 'Desafiador',
       imageId: 'adventure-3',
       registrationsEnabled: false,
+      customFields: [],
     },
   ],
   [
@@ -64,6 +70,7 @@ let adventures: Map<string, Adventure> = new Map([
       difficulty: 'Moderado',
       imageId: 'adventure-4',
       registrationsEnabled: true,
+      customFields: [],
     },
   ],
 ]);
@@ -132,7 +139,12 @@ export async function saveAdventure(adventure: Omit<Adventure, 'id' | 'slug'> & 
     await delay(500);
     if (adventure.id && adventures.has(adventure.id)) {
         // Update
-        const updatedAdventure = { ...adventures.get(adventure.id)!, ...adventure };
+        const existingAdventure = adventures.get(adventure.id)!;
+        const updatedAdventure: Adventure = { 
+            ...existingAdventure, 
+            ...adventure,
+            customFields: adventure.customFields || existingAdventure.customFields || []
+        };
         adventures.set(adventure.id, updatedAdventure);
         return updatedAdventure;
     } else {
@@ -143,6 +155,7 @@ export async function saveAdventure(adventure: Omit<Adventure, 'id' | 'slug'> & 
             ...adventure,
             id: newId,
             slug: `${slug}-${newId}`,
+            customFields: adventure.customFields || []
         };
         adventures.set(newId, newAdventure);
         return newAdventure;

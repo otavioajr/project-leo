@@ -17,6 +17,12 @@ import { Compass, ListChecks, User, Mail, Phone, Users } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+function formatFieldName(name: string) {
+    const words = name.replace(/_/g, ' ').split(' ');
+    return words.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
+
 export default async function AdminDashboard() {
   const adventures = await getAdventures();
   const registrations = await getRegistrations();
@@ -81,9 +87,17 @@ export default async function AdminDashboard() {
                         <span className="font-medium flex items-center gap-2"><User className="h-3 w-3" />{reg.name}</span>
                         <span className="text-sm text-muted-foreground flex items-center gap-2"><Users className="h-3 w-3" />{reg.groupSize} {reg.groupSize > 1 ? 'pessoas' : 'pessoa'}</span>
                         {reg.participants && reg.participants.length > 0 && (
-                            <div className="pl-5 py-1 text-sm text-muted-foreground border-l border-dashed ml-1.5 space-y-1">
+                            <div className="pl-5 py-1 text-sm text-muted-foreground border-l border-dashed ml-1.5 space-y-2">
                                 {reg.participants.map((p, i) => (
-                                    <div key={i} className="flex items-center gap-2"><User className="h-3 w-3 opacity-70" />{p.name}</div>
+                                     <div key={i} className="space-y-1">
+                                        <div className="flex items-center gap-2 text-foreground"><User className="h-3 w-3 opacity-70" />{p.name}</div>
+                                         <div className="pl-5 text-xs">
+                                            {Object.entries(p).map(([key, value]) => {
+                                                if (key === 'name' || !value) return null;
+                                                return <div key={key}><span className="font-medium">{formatFieldName(key)}:</span> {value}</div>
+                                            })}
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
                         )}

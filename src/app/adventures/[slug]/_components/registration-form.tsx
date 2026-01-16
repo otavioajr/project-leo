@@ -17,17 +17,18 @@ import { Input } from "@/components/ui/input";
 import { registerForAdventure } from "@/lib/actions";
 import { useState, useEffect } from "react";
 import { Separator } from "@/components/ui/separator";
+import type { CustomField } from "@/lib/types";
+
+const participantSchema = z.object({
+  name: z.string().min(2, "O nome do participante é obrigatório."),
+}).catchall(z.string());
 
 const registrationSchema = z.object({
   name: z.string().min(2, "O nome do contato deve ter pelo menos 2 caracteres."),
   email: z.string().email("Por favor, insira um endereço de e-mail válido."),
   phone: z.string().min(10, "Por favor, insira um número de telefone válido."),
   groupSize: z.coerce.number().min(1, "O grupo deve ter pelo menos 1 pessoa."),
-  participants: z.array(
-    z.object({
-      name: z.string().min(2, "O nome do participante deve ter pelo menos 2 caracteres."),
-    })
-  ),
+  participants: z.array(participantSchema),
 });
 
 
@@ -36,9 +37,10 @@ type RegistrationFormValues = z.infer<typeof registrationSchema>;
 type RegistrationFormProps = {
   adventureId: string;
   adventureTitle: string;
+  customFields?: CustomField[];
 };
 
-export function RegistrationForm({ adventureId, adventureTitle }: RegistrationFormProps) {
+export function RegistrationForm({ adventureId, adventureTitle, customFields }: RegistrationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const form = useForm<RegistrationFormValues>({
@@ -64,17 +66,48 @@ export function RegistrationForm({ adventureId, adventureTitle }: RegistrationFo
     const currentParticipantCount = fields.length;
 
     if (desiredParticipantCount > currentParticipantCount) {
+      const newFields = [];
       for (let i = 0; i < desiredParticipantCount - currentParticipantCount; i++) {
-        append({ name: "" });
+        const newParticipant: Record<string, string> = { name: "" };
+        customFields?.forEach(field => {
+            newParticipant[field.name] = "";
+        });
+        newFields.push(newParticipant);
       }
+      append(newFields);
     } else if (desiredParticipantCount < currentParticipantCount) {
         remove(Array.from({ length: currentParticipantCount - desiredParticipantCount }, (_, i) => desiredParticipantCount + i));
     }
-  }, [groupSize, fields.length, append, remove]);
+  }, [groupSize, fields.length, append, remove, customFields]);
 
 
   async function onSubmit(values: RegistrationFormValues) {
     setIsSubmitting(true);
+    
+    // Manual validation for required custom fields
+    let isValid = true;
+    values.participants.forEach((participant, pIndex) => {
+        customFields?.forEach(cf => {
+            if (cf.required && !participant[cf.name]) {
+                form.setError(`participants.${pIndex}.${cf.name}`, {
+                    type: 'manual',
+                    message: `${cf.label} é obrigatório.`
+                });
+                isValid = false;
+            }
+        });
+    });
+
+    if (!isValid) {
+        toast({
+            title: "Campos Obrigatórios",
+            description: "Por favor, preencha todos os campos obrigatórios para cada participante.",
+            variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+    }
+
     const result = await registerForAdventure({
       ...values,
       adventureId,
@@ -87,7 +120,6 @@ export function RegistrationForm({ adventureId, adventureTitle }: RegistrationFo
         description: "Recebemos sua inscrição. Nos vemos na trilha!",
       });
       form.reset();
-      // Reset field array manually
       remove();
     } else {
       toast({
@@ -161,8 +193,8 @@ export function RegistrationForm({ adventureId, adventureTitle }: RegistrationFo
 
         {fields.length > 0 && <Separator />}
 
-        {fields.map((field, index) => (
-           <div key={field.id} className="space-y-4">
+        {fields.map((participantField, index) => (
+           <div key={participantField.id} className="space-y-4 border p-4 rounded-lg bg-muted/50">
              <h3 className="text-lg font-medium">Dados do Participante {index + 2}</h3>
              <FormField
                control={form.control}
@@ -177,6 +209,26 @@ export function RegistrationForm({ adventureId, adventureTitle }: RegistrationFo
                  </FormItem>
                )}
              />
+            {customFields?.map((customField) => (
+                <FormField
+                    key={customField.name}
+                    control={form.control}
+                    name={`participants.${index}.${customField.name}`}
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>{customField.label}{customField.required && <span className="text-destructive">*</span>}</FormLabel>
+                            <FormControl>
+                                <Input 
+                                    placeholder={customField.label}
+                                    type={customField.type} 
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            ))}
            </div>
          ))}
 

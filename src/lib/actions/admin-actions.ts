@@ -4,6 +4,13 @@ import { z } from "zod";
 import { saveAdventure as dbSaveAdventure, deleteAdventure as dbDeleteAdventure } from "../data";
 import { revalidatePath } from "next/cache";
 
+const customFieldSchema = z.object({
+  name: z.string().min(1, "O nome do campo é obrigatório.").regex(/^[a-z0-9_]+$/, "Use apenas letras minúsculas, números e sublinhados (sem espaços)."),
+  label: z.string().min(1, "O rótulo é obrigatório."),
+  type: z.enum(['text', 'email', 'tel', 'number']),
+  required: z.boolean(),
+});
+
 const adventureSchema = z.object({
   id: z.string().optional(),
   title: z.string().min(3),
@@ -15,6 +22,7 @@ const adventureSchema = z.object({
   difficulty: z.enum(["Fácil", "Moderado", "Desafiador"]),
   imageId: z.string().min(1),
   registrationsEnabled: z.boolean(),
+  customFields: z.array(customFieldSchema).optional(),
 });
 
 export async function saveAdventure(data: unknown) {
