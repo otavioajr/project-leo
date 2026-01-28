@@ -57,10 +57,12 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
-        <Link href="/" className="mr-6 flex items-center gap-2">
-          <Mountain className="h-6 w-6 text-primary" />
-          <span className="font-bold text-lg font-headline">Chaves Adventure</span>
-        </Link>
+        <div className="flex-1">
+            <Link href="/" className="flex items-center gap-2">
+            <Mountain className="h-6 w-6 text-primary" />
+            <span className="font-bold text-lg font-headline">Chaves Adventure</span>
+            </Link>
+        </div>
 
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
           {navLinks.map((link) => (
@@ -68,34 +70,36 @@ export function Header() {
           ))}
         </nav>
 
-        <div className="flex flex-1 items-center justify-end gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/admin">
-              <UserCircle className="h-5 w-5" />
-              <span className="sr-only">Painel Administrativo</span>
-            </Link>
-          </Button>
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="md:hidden">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Alternar menu de navegação</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right">
-              <div className="flex flex-col gap-4 py-8">
-                <Link href="/" className="mb-4 flex items-center gap-2 px-4">
-                  <Mountain className="h-6 w-6 text-primary" />
-                  <span className="font-bold">Chaves Adventure</span>
+        <div className="flex-1 flex justify-end">
+            <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" asChild>
+                <Link href="/admin">
+                <UserCircle className="h-5 w-5" />
+                <span className="sr-only">Painel Administrativo</span>
                 </Link>
-                <nav className="flex flex-col gap-2">
-                  {navLinks.map((link) => (
-                    <MobileNavLink key={link.href} {...link} />
-                  ))}
-                </nav>
-              </div>
-            </SheetContent>
-          </Sheet>
+            </Button>
+            <Sheet>
+                <SheetTrigger asChild>
+                <Button variant="outline" size="icon" className="md:hidden">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Alternar menu de navegação</span>
+                </Button>
+                </SheetTrigger>
+                <SheetContent side="right">
+                <div className="flex flex-col gap-4 py-8">
+                    <Link href="/" className="mb-4 flex items-center gap-2 px-4">
+                    <Mountain className="h-6 w-6 text-primary" />
+                    <span className="font-bold">Chaves Adventure</span>
+                    </Link>
+                    <nav className="flex flex-col gap-2">
+                    {navLinks.map((link) => (
+                        <MobileNavLink key={link.href} {...link} />
+                    ))}
+                    </nav>
+                </div>
+                </SheetContent>
+            </Sheet>
+            </div>
         </div>
       </div>
     </header>
