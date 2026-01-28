@@ -1,36 +1,43 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Função auxiliar para verificar se o usuário é um administrador
     function isAdmin() {
       return request.auth != null && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
-    // Publicamente legível
-    match /pages/{pageSlug} {
+    // Regra para a coleção 'pages'
+    // Todos podem ler, apenas administradores podem escrever.
+    match /pages/{pageId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Publicamente legível
+    // Regra para a coleção 'adventures'
+    // Todos podem ler, apenas administradores podem escrever.
     match /adventures/{adventureId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Publicamente legível
-    match /content/{docId} {
-       allow read: if true;
-       allow write: if isAdmin();
+    // Regra para a coleção 'content'
+    // Todos podem ler, apenas administradores podem escrever.
+    match /content/{contentId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // Requer login para criar, apenas admin pode gerenciar
+    // Regra para a coleção 'registrations'
+    // Usuários logados podem criar, apenas administradores podem gerenciar o resto.
     match /registrations/{registrationId} {
       allow create: if request.auth != null;
       allow read, update, delete: if isAdmin();
     }
 
-    // Apenas o próprio usuário pode ler seu status de admin
+    // Regra para a coleção 'roles_admin'
+    // Apenas o próprio usuário pode ler seu status de admin. Ninguém pode listar ou modificar.
     match /roles_admin/{userId} {
       allow get: if request.auth.uid == userId;
       allow list, create, update, delete: if false;
