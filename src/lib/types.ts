@@ -41,3 +41,9 @@ export type HomePageContent = {
   adventuresTitle: string;
   adventuresDescription: string;
 };
+
+export type ContentPage = {
+  slug: string;
+  title: string;
+  content: string;
+};

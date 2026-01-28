@@ -1,8 +1,9 @@
 "use server";
 
 import { z } from "zod";
-import { saveAdventure as dbSaveAdventure, deleteAdventure as dbDeleteAdventure, saveHomePageContent as dbSaveHomePageContent } from "../data";
+import { saveAdventure as dbSaveAdventure, deleteAdventure as dbDeleteAdventure, saveHomePageContent as dbSaveHomePageContent, saveContentPage as dbSaveContentPage } from "../data";
 import { revalidatePath } from "next/cache";
+import type { ContentPage } from "../types";
 
 const customFieldSchema = z.object({
   name: z.string().min(1, "O nome do campo é obrigatório.").regex(/^[a-z0-9_]+$/, "Use apenas letras minúsculas, números e sublinhados (sem espaços)."),
@@ -85,5 +86,29 @@ export async function saveHomePageContent(data: unknown) {
   } catch (error) {
     console.error("Failed to save home page content:", error);
     return { success: false, message: "Não foi possível salvar o conteúdo da página principal." };
+  }
+}
+
+const contentPageSchema = z.object({
+    slug: z.string(),
+    title: z.string().min(1, "O título é obrigatório."),
+    content: z.string().min(1, "O conteúdo não pode estar vazio."),
+});
+
+export async function saveContentPage(data: unknown) {
+  const parsed = contentPageSchema.safeParse(data);
+
+  if (!parsed.success) {
+    return { success: false, message: "Dados da página inválidos.", errors: parsed.error.issues };
+  }
+
+  try {
+    const savedPage = await dbSaveContentPage(parsed.data as ContentPage);
+    revalidatePath(`/admin/paginas/${savedPage.slug}`);
+    revalidatePath(`/${savedPage.slug}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to save content page:", error);
+    return { success: false, message: "Não foi possível salvar a página de conteúdo." };
   }
 }

@@ -1,4 +1,4 @@
-import type { Adventure, Registration, HomePageContent } from './types';
+import type { Adventure, Registration, HomePageContent, ContentPage } from './types';
 
 // Using a Map for easier CRUD operations
 let adventures: Map<string, Adventure> = new Map([
@@ -113,6 +113,33 @@ let homePageContent: HomePageContent = {
   adventuresDescription: "De caminhadas serenas a escaladas emocionantes, encontre a experiência perfeita para você.",
 };
 
+let contentPages: Map<string, ContentPage> = new Map([
+    [
+        'about',
+        {
+            slug: 'about',
+            title: 'Sobre Nós',
+            content: '<h2>Nossa História</h2><p>A Alpina Aventuras nasceu da paixão pelas montanhas e pelo desejo de compartilhar a beleza da natureza com o mundo. Fundada por um grupo de guias experientes, nossa missão é proporcionar experiências ao ar livre seguras, memoráveis e emocionantes para todos os níveis de aventureiros.</p><h2>Nossa Equipe</h2><p>Nossos guias são certificados, apaixonados pelo que fazem e têm um profundo conhecimento da região. Estamos aqui para garantir que sua aventura seja nada menos que espetacular.</p>'
+        }
+    ],
+    [
+        'contact',
+        {
+            slug: 'contact',
+            title: 'Entre em Contato',
+            content: '<h2>Tem alguma pergunta?</h2><p>Adoraríamos ouvir de você! Seja para saber mais sobre uma aventura específica, fazer uma reserva de grupo ou simplesmente dizer olá, nossa equipe está pronta para ajudar.</p><ul class="mt-4 space-y-2"><li><strong>Email:</strong> <a href="mailto:contato@alpinaaventuras.com">contato@alpinaaventuras.com</a></li><li><strong>Telefone:</strong> <a href="tel:+5599999999999">(99) 99999-9999</a></li><li><strong>Endereço:</strong> Rua da Montanha, 123, Vale Sereno</li></ul>'
+        }
+    ],
+    [
+        'privacy',
+        {
+            slug: 'privacy',
+            title: 'Política de Privacidade',
+            content: '<h2>Coleta de Informações</h2><p>Coletamos informações que você nos fornece diretamente ao se registrar para uma aventura. Isso inclui seu nome, e-mail e telefone.</p><h2>Uso das Informações</h2><p>Usamos suas informações para processar suas inscrições, nos comunicarmos com você sobre sua aventura e, se você permitir, enviar novidades sobre futuras atividades.</p><h2>Compartilhamento de Informações</h2><p>Não compartilhamos suas informações pessoais com terceiros, exceto quando necessário para fornecer os serviços da aventura (por exemplo, com parceiros de seguro).</p>'
+        }
+    ]
+]);
+
 // Simulate API latency
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -194,4 +221,20 @@ export async function saveHomePageContent(content: HomePageContent): Promise<Hom
     await delay(500);
     homePageContent = { ...content };
     return homePageContent;
+}
+
+export async function getContentPages(): Promise<ContentPage[]> {
+    await delay(50);
+    return Array.from(contentPages.values());
+}
+
+export async function getContentPageBySlug(slug: string): Promise<ContentPage | undefined> {
+    await delay(50);
+    return contentPages.get(slug);
+}
+
+export async function saveContentPage(page: ContentPage): Promise<ContentPage> {
+    await delay(500);
+    contentPages.set(page.slug, page);
+    return page;
 }

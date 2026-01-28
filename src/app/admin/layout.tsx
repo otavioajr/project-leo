@@ -13,7 +13,7 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Mountain, LayoutDashboard, Compass, ListChecks, Home } from "lucide-react";
+import { Mountain, LayoutDashboard, Compass, ListChecks, Home, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
@@ -21,6 +21,7 @@ const navItems = [
   { href: "/admin/adventures", label: "Aventuras", icon: Compass },
   { href: "/admin/registrations", label: "Inscrições", icon: ListChecks },
   { href: "/admin/pagina-principal", label: "Página Principal", icon: Home },
+  { href: "/admin/paginas", label: "Páginas", icon: FileText },
 ];
 
 export default function AdminLayout({
@@ -49,7 +50,7 @@ export default function AdminLayout({
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname === item.href}
+                  isActive={pathname.startsWith(item.href) && (pathname === item.href || pathname.startsWith(item.href + '/'))}
                   tooltip={{ children: item.label, className: "bg-primary text-primary-foreground" }}
                 >
                   <Link href={item.href}>
