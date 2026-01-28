@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { ContentPage } from "@/lib/types";
 import { useFirebase } from "@/firebase";
@@ -83,7 +83,7 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
   });
   
   const title = form.watch('title');
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isEditing && title) {
         form.setValue('slug', createSlug(title), { shouldValidate: true });
     }

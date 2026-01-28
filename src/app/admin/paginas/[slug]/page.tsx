@@ -3,8 +3,8 @@
 import { useParams, notFound } from "next/navigation";
 import { ContentPageForm } from "../_components/content-page-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
 import type { ContentPage } from "@/lib/types";
 import { LoaderCircle } from "lucide-react";
 
@@ -14,10 +14,18 @@ export default function EditContentPage() {
   const slug = params.slug as string;
   const firestore = useFirestore();
 
-  const pageRef = useMemoFirebase(() => doc(firestore, 'pages', slug), [firestore, slug]);
-  const { data: page, isLoading } = useDoc<ContentPage>(pageRef);
+  // Busca todos os documentos e filtra no cliente (evita problemas com índice/where)
+  const pagesQuery = useMemoFirebase(
+    () => collection(firestore, 'pages'),
+    [firestore]
+  );
+  const { data: allPages, isLoading } = useCollection<ContentPage>(pagesQuery);
+  
+  // Filtra pelo slug no cliente
+  const page = allPages?.find(p => p.slug === slug);
 
-  if (isLoading) {
+  // Mostrar loading enquanto carrega OU enquanto allPages ainda é null
+  if (isLoading || allPages === null) {
     return (
         <div className="flex items-center justify-center p-8">
             <LoaderCircle className="animate-spin" />
@@ -25,7 +33,8 @@ export default function EditContentPage() {
     )
   }
 
-  if (!page) {
+  // Só mostrar 404 depois de confirmar que allPages é um array e não encontrou a página
+  if (Array.isArray(allPages) && !page) {
     return notFound();
   }
 
@@ -43,3 +52,4 @@ export default function EditContentPage() {
     </Card>
   );
 }
+

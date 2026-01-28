@@ -9,15 +9,13 @@ import type { ContentPage } from "@/lib/types";
 export function Footer() {
   const firestore = useFirestore();
 
-  const pagesQuery = useMemoFirebase(() => {
-    return query(
-        collection(firestore, 'pages'), 
-        where('showInHeader', '==', true),
-        orderBy('navOrder', 'asc')
-    );
-  }, [firestore]);
-
-  const { data: dynamicPages } = useCollection<ContentPage>(pagesQuery);
+  const pagesQuery = useMemoFirebase(() => collection(firestore, 'pages'), [firestore]);
+  const { data: allPages } = useCollection<ContentPage>(pagesQuery);
+  
+  // Filtra e ordena no cliente para evitar problemas de índice composto
+  const dynamicPages = allPages
+    ?.filter(p => p.showInHeader === true)
+    ?.sort((a, b) => (a.navOrder ?? 0) - (b.navOrder ?? 0));
 
   const socialLinks = [
     { name: "Facebook", href: "#" },

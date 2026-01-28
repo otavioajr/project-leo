@@ -2,7 +2,7 @@
 
 import { notFound, useParams } from "next/navigation";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, where, limit } from "firebase/firestore";
+import { collection } from "firebase/firestore";
 import type { ContentPage } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -25,28 +25,33 @@ export default function DynamicPage() {
   const slug = params.slug as string;
   const firestore = useFirestore();
 
-  const pageQuery = useMemoFirebase(() => {
-    if (!slug) return null;
-    return query(collection(firestore, 'pages'), where('slug', '==', slug), limit(1));
-  }, [firestore, slug]);
+  // Busca todos os documentos e filtra no cliente (evita problemas com query where)
+  const pagesQuery = useMemoFirebase(
+    () => collection(firestore, 'pages'),
+    [firestore]
+  );
+  const { data: allPages, isLoading } = useCollection<ContentPage>(pagesQuery);
+  
+  // Filtra pelo slug no cliente
+  const page = allPages?.find(p => p.slug === slug);
 
-  const { data: pages, isLoading } = useCollection<ContentPage>(pageQuery);
-  const page = pages?.[0];
-
-  if (isLoading) {
+  // Mostrar loading enquanto carrega OU enquanto allPages ainda é null
+  if (isLoading || allPages === null) {
     return <PageLoading />;
   }
 
-  if (!page) {
+  // Só mostrar 404 depois de confirmar que allPages é um array e não encontrou a página
+  if (Array.isArray(allPages) && !page) {
     notFound();
   }
 
   return (
     <div className="container mx-auto px-6 py-12">
         <div className="max-w-4xl mx-auto">
-            <h1 className="font-headline text-3xl md:text-4xl font-bold text-primary mb-8">{page.title}</h1>
-            <div className="content-page" dangerouslySetInnerHTML={{ __html: page.content }} />
+            <h1 className="font-headline text-3xl md:text-4xl font-bold text-primary mb-8">{page?.title}</h1>
+            <div className="content-page" dangerouslySetInnerHTML={{ __html: page?.content || '' }} />
         </div>
     </div>
   );
 }
+

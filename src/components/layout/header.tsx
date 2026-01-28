@@ -26,15 +26,13 @@ export function Header() {
   const pathname = usePathname();
   const firestore = useFirestore();
 
-  const pagesQuery = useMemoFirebase(() => {
-    return query(
-        collection(firestore, 'pages'), 
-        where('showInHeader', '==', true),
-        orderBy('navOrder', 'asc')
-    );
-  }, [firestore]);
+  const pagesQuery = useMemoFirebase(() => collection(firestore, 'pages'), [firestore]);
+  const { data: allPages, isLoading } = useCollection<ContentPage>(pagesQuery);
   
-  const { data: dynamicPages, isLoading } = useCollection<ContentPage>(pagesQuery);
+  // Filtra e ordena no cliente para evitar problemas de índice composto
+  const dynamicPages = allPages
+    ?.filter(p => p.showInHeader === true)
+    ?.sort((a, b) => (a.navOrder ?? 0) - (b.navOrder ?? 0));
 
   const navLinks = [
     ...staticLinks,
