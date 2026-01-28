@@ -7,26 +7,65 @@ import { Badge } from '@/components/ui/badge';
 import { DollarSign, Timer, BarChart, MapPin, Info, LoaderCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RegistrationForm } from './_components/registration-form';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, limit } from 'firebase/firestore';
+import { useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import type { Adventure } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useState, useEffect } from 'react';
+
+// Custom hook para buscar a aventura
+function useFetchAdventure(slug: string, firestore: any) {
+  const [adventure, setAdventure] = useState<Adventure | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    async function fetchAdventure() {
+      if (!slug) {
+        setAdventure(null);
+        setIsLoading(false);
+        setError(null);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const q = query(collection(firestore, 'adventures'), where('slug', '==', slug));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          const doc = querySnapshot.docs[0];
+          setAdventure({ ...(doc.data() as Adventure), id: doc.id });
+        } else {
+          setAdventure(null);
+        }
+        setIsLoading(false);
+      } catch (err) {
+        setError(err as Error);
+        setIsLoading(false);
+      }
+    }
+
+    fetchAdventure();
+  }, [firestore, slug]);
+
+  return { adventure, isLoading, error };
+}
 
 export default function AdventurePage() {
   const params = useParams();
   const slug = params.slug as string;
   const firestore = useFirestore();
 
-  const adventureQuery = useMemoFirebase(() => {
-    if (!slug) return null;
-    return query(collection(firestore, 'adventures'), where('slug', '==', slug), limit(1));
-  }, [firestore, slug]);
-  
-  const { data: adventures, isLoading } = useCollection<Adventure>(adventureQuery);
-  
-  const adventure = adventures?.[0];
+  const { adventure, isLoading, error } = useFetchAdventure(slug, firestore);
 
-  if (isLoading) {
+  // #region agent log
+fetch('http://127.0.0.1:7245/ingest/2504dd8c-0bee-40fd-ad39-1b23a3e33837',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'src/app/adventures/[slug]/page.tsx:64',message:'AdventurePage rendering',data:{slug, isLoading, error: error?.message, adventureExists: !!adventure},timestamp:Date.now(),sessionId:'debug-session',runId:'verify',hypothesisId:'N'})}).catch(()=>{});
+// #endregion
+
+if (isLoading) {
     return (
         <div className="container mx-auto px-6 py-12">
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
@@ -42,6 +81,16 @@ export default function AdventurePage() {
                 </div>
             </div>
         </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-6 py-12">
+        <div className="text-center">
+          <p className="text-red-500">Erro ao carregar aventura: {error.message}</p>
+        </div>
+      </div>
     );
   }
 

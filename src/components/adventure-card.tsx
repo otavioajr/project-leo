@@ -22,11 +22,12 @@ export function AdventureCard({ adventure }: AdventureCardProps) {
     'Moderado': 'secondary',
     'Desafiador': 'destructive',
   } as const;
+  const adventureSlug = adventure.slug || adventure.id;
 
   return (
     <Card className="flex flex-col overflow-hidden rounded-lg shadow-md transition-shadow hover:shadow-xl">
       <CardHeader className="p-0">
-        <Link href={`/adventures/${adventure.slug}`} className="block">
+        <Link href={`/adventures/${adventureSlug}`} className="block">
           <div className="relative h-48 w-full">
             {adventure.imageUrl ? (
               <Image
@@ -44,7 +45,7 @@ export function AdventureCard({ adventure }: AdventureCardProps) {
       </CardHeader>
       <CardContent className="flex-1 p-6">
         <CardTitle className="mb-2 font-headline text-xl">
-          <Link href={`/adventures/${adventure.slug}`} className="hover:text-primary">
+          <Link href={`/adventures/${adventureSlug}`} className="hover:text-primary">
             {adventure.title}
           </Link>
         </CardTitle>
@@ -70,7 +71,7 @@ export function AdventureCard({ adventure }: AdventureCardProps) {
       </CardContent>
       <CardFooter className="p-6 pt-0">
         <Button asChild className="w-full" variant="outline">
-          <Link href={`/adventures/${adventure.slug}`}>
+          <Link href={`/adventures/${adventureSlug}`}>
             Saiba Mais <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </Button>
