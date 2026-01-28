@@ -61,11 +61,7 @@ export default function AdventurePage() {
 
   const { adventure, isLoading, error } = useFetchAdventure(slug, firestore);
 
-  // #region agent log
-fetch('http://127.0.0.1:7245/ingest/2504dd8c-0bee-40fd-ad39-1b23a3e33837',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'src/app/adventures/[slug]/page.tsx:64',message:'AdventurePage rendering',data:{slug, isLoading, error: error?.message, adventureExists: !!adventure},timestamp:Date.now(),sessionId:'debug-session',runId:'verify',hypothesisId:'N'})}).catch(()=>{});
-// #endregion
-
-if (isLoading) {
+  if (isLoading) {
     return (
         <div className="container mx-auto px-6 py-12">
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
