@@ -1,7 +1,6 @@
 import { getAdventureBySlug } from '@/lib/data';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DollarSign, Timer, BarChart, MapPin, Info } from 'lucide-react';
@@ -21,8 +20,6 @@ export default async function AdventurePage({ params }: AdventurePageProps) {
     notFound();
   }
 
-  const image = PlaceHolderImages.find((img) => img.id === adventure.imageId);
-
   const difficultyVariant = {
     'Fácil': 'default',
     'Moderado': 'secondary',
@@ -34,13 +31,12 @@ export default async function AdventurePage({ params }: AdventurePageProps) {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
         <div className="lg:col-span-3">
           <div className="relative h-[400px] md:h-[500px] w-full mb-8 rounded-lg overflow-hidden shadow-lg">
-            {image && (
+            {adventure.imageUrl && (
               <Image
-                src={image.imageUrl}
-                alt={image.description}
+                src={adventure.imageUrl}
+                alt={adventure.imageDescription}
                 fill
                 className="object-cover"
-                data-ai-hint={image.imageHint}
                 priority
               />
             )}

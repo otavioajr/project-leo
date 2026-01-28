@@ -14,7 +14,8 @@ let adventures: Map<string, Adventure> = new Map([
       duration: 'Dia Inteiro',
       location: 'Crista Alpina',
       difficulty: 'Moderado',
-      imageId: 'adventure-1',
+      imageUrl: 'https://images.unsplash.com/photo-1633421459525-f224f11f5b33?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxoaWtpbmclMjBtb3VudGFpbnxlbnwwfHx8fDE3Njg1NjQ2MzZ8MA&ixlib=rb-4.1.0&q=80&w=1080',
+      imageDescription: 'Um grupo de caminhantes em uma trilha em uma floresta exuberante e verde.',
       registrationsEnabled: true,
       customFields: [
         { name: 'cpf', label: 'CPF', type: 'text', required: true },
@@ -34,7 +35,8 @@ let adventures: Map<string, Adventure> = new Map([
       duration: 'Meio Dia',
       location: 'Lago Espelhado',
       difficulty: 'Fácil',
-      imageId: 'adventure-2',
+      imageUrl: 'https://images.unsplash.com/photo-1669659738635-7af645bb8a5b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxrYXlha2luZyUyMGxha2V8ZW58MHx8fHwxNzY4NTY0NjM2fDA&ixlib=rb-4.1.0&q=80&w=1080',
+      imageDescription: 'Duas pessoas andando de caiaque em um lago calmo e claro cercado por montanhas.',
       registrationsEnabled: true,
       customFields: [],
     },
@@ -51,7 +53,8 @@ let adventures: Map<string, Adventure> = new Map([
       duration: 'Dia Inteiro',
       location: 'Picos de Granito',
       difficulty: 'Desafiador',
-      imageId: 'adventure-3',
+      imageUrl: 'https://images.unsplash.com/photo-1522163182402-834f871fd851?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxyb2NrJTIwY2xpbWJpbmd8ZW58MHx8fHwxNzY4NTY0NjM1fDA&ixlib=rb-4.1.0&q=80&w=1080',
+      imageDescription: 'Uma pessoa escalando uma face de penhasco íngreme com equipamento de segurança.',
       registrationsEnabled: false,
       customFields: [],
     },
@@ -68,7 +71,8 @@ let adventures: Map<string, Adventure> = new Map([
       duration: 'Meio Dia',
       location: 'Floresta do Vale do Pinheiro',
       difficulty: 'Moderado',
-      imageId: 'adventure-4',
+      imageUrl: 'https://images.unsplash.com/photo-1511994298241-608e28f14fde?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxtb3VudGFpbiUyMGJpa2luZ3xlbnwwfHx8fDE3Njg1NjQ2MzV8MA&ixlib=rb-4.1.0&q=80&w=1080',
+      imageDescription: 'Um ciclista de montanha descendo um caminho de terra em uma floresta.',
       registrationsEnabled: true,
       customFields: [],
     },
@@ -135,7 +139,7 @@ export async function addRegistration(registration: Omit<Registration, 'id' | 'r
     return newRegistration;
 }
 
-export async function saveAdventure(adventure: Omit<Adventure, 'id' | 'slug'> & { id?: string }): Promise<Adventure> {
+export async function saveAdventure(adventure: Omit<Adventure, 'id' | 'slug' | 'imageDescription'> & { id?: string; imageDescription?: string }): Promise<Adventure> {
     await delay(500);
     if (adventure.id && adventures.has(adventure.id)) {
         // Update
@@ -143,6 +147,7 @@ export async function saveAdventure(adventure: Omit<Adventure, 'id' | 'slug'> & 
         const updatedAdventure: Adventure = { 
             ...existingAdventure, 
             ...adventure,
+            imageDescription: adventure.imageDescription || existingAdventure.imageDescription,
             customFields: adventure.customFields || existingAdventure.customFields || []
         };
         adventures.set(adventure.id, updatedAdventure);
@@ -152,7 +157,7 @@ export async function saveAdventure(adventure: Omit<Adventure, 'id' | 'slug'> & 
         const newId = (adventures.size + 5).toString(); // use a higher start to avoid collision with initial data
         const slug = adventure.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
         const newAdventure: Adventure = {
-            ...adventure,
+            ...(adventure as Omit<Adventure, 'id' | 'slug'>),
             id: newId,
             slug: `${slug}-${newId}`,
             customFields: adventure.customFields || []

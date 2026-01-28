@@ -20,7 +20,8 @@ const adventureSchema = z.object({
   duration: z.string().min(1),
   location: z.string().min(1),
   difficulty: z.enum(["Fácil", "Moderado", "Desafiador"]),
-  imageId: z.string().min(1),
+  imageUrl: z.string().url("URL da imagem inválida."),
+  imageDescription: z.string().min(1, "A descrição da imagem é obrigatória."),
   registrationsEnabled: z.boolean(),
   customFields: z.array(customFieldSchema).optional(),
 });

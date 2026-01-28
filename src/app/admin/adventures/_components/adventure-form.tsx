@@ -59,7 +59,8 @@ const adventureSchema = z.object({
   duration: z.string().min(1, "A duração é obrigatória."),
   location: z.string().min(1, "A localização é obrigatória."),
   difficulty: z.enum(["Fácil", "Moderado", "Desafiador"]),
-  imageId: z.string().min(1, "O ID da imagem é obrigatório."),
+  imageUrl: z.string().url("URL da imagem inválida."),
+  imageDescription: z.string().min(1, "A descrição da imagem é obrigatória."),
   registrationsEnabled: z.boolean(),
   customFields: z.array(customFieldSchema).optional(),
 });
@@ -86,7 +87,8 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       duration: adventure?.duration || "",
       location: adventure?.location || "",
       difficulty: adventure?.difficulty || "Moderado",
-      imageId: adventure?.imageId || "adventure-1",
+      imageUrl: adventure?.imageUrl || "",
+      imageDescription: adventure?.imageDescription || "",
       registrationsEnabled: adventure?.registrationsEnabled ?? true,
       customFields: adventure?.customFields || [],
     },
@@ -183,6 +185,33 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="imageUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>URL da Imagem</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://exemplo.com/imagem.jpg" {...field} />
+                  </FormControl>
+                  <FormDescription>Link para a imagem principal da aventura.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="imageDescription"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descrição da Imagem (Texto Alternativo)</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Uma descrição concisa da imagem para acessibilidade." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
           <div className="space-y-8">
             <FormField
@@ -242,20 +271,6 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                       <SelectItem value="Desafiador">Desafiador</SelectItem>
                     </SelectContent>
                   </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="imageId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>ID da Imagem</FormLabel>
-                  <FormControl>
-                    <Input placeholder="ex: aventura-1" {...field} />
-                  </FormControl>
-                   <FormDescription>De placeholder-images.json</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

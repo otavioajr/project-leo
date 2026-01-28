@@ -15,7 +15,8 @@ export type Adventure = {
   duration: string;
   location: string;
   difficulty: 'Fácil' | 'Moderado' | 'Desafiador';
-  imageId: string;
+  imageUrl: string;
+  imageDescription: string;
   registrationsEnabled: boolean;
   customFields?: CustomField[];
 };

@@ -1,7 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Adventure } from '@/lib/types';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import {
   Card,
   CardContent,
@@ -18,8 +17,6 @@ type AdventureCardProps = {
 };
 
 export function AdventureCard({ adventure }: AdventureCardProps) {
-  const image = PlaceHolderImages.find((img) => img.id === adventure.imageId);
-
   const difficultyVariant = {
     'Fácil': 'default',
     'Moderado': 'secondary',
@@ -31,14 +28,13 @@ export function AdventureCard({ adventure }: AdventureCardProps) {
       <CardHeader className="p-0">
         <Link href={`/adventures/${adventure.slug}`} className="block">
           <div className="relative h-48 w-full">
-            {image ? (
+            {adventure.imageUrl ? (
               <Image
-                src={image.imageUrl}
-                alt={image.description}
+                src={adventure.imageUrl}
+                alt={adventure.imageDescription}
                 fill
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                data-ai-hint={image.imageHint}
               />
             ) : (
               <div className="h-full w-full bg-muted" />
