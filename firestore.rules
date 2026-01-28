@@ -2,54 +2,36 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Função auxiliar para verificar se um usuário está autenticado.
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Função auxiliar para verificar se o usuário autenticado tem permissão de administrador.
     function isAdmin() {
       return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
-    // Função que define explicitamente o acesso de leitura pública.
-    function isPublic() {
-      return true;
-    }
-
     match /adventures/{adventureId} {
-      // Qualquer pessoa pode ver as aventuras.
-      allow read: if isPublic();
-      // Apenas administradores podem criar, atualizar ou excluir aventuras.
+      allow read: if true;
       allow write: if isAdmin();
     }
 
     match /registrations/{registrationId} {
-      // Qualquer usuário autenticado pode criar uma inscrição.
       allow create: if isSignedIn();
-      // Apenas administradores podem ler, atualizar ou excluir inscrições.
       allow read, update, delete: if isAdmin();
     }
 
     match /content/{docId} {
-       // O conteúdo da página inicial é público.
-       allow read: if isPublic();
-       // Apenas administradores podem editar o conteúdo da página inicial.
+       allow read: if true;
        allow write: if isAdmin();
     }
 
     match /pages/{pageSlug} {
-      // Qualquer pessoa pode ver as páginas de conteúdo estático.
-      allow read: if isPublic();
-      // Apenas administradores podem criar, atualizar ou excluir páginas.
+      allow read: if true;
       allow write: if isAdmin();
     }
     
     match /roles_admin/{userId} {
-      // Um usuário pode verificar seu próprio status de administrador.
       allow read: if request.auth.uid == userId;
-      // As gravações são proibidas do lado do cliente para evitar escalonamento de privilégios.
-      // Os administradores devem ser gerenciados a partir do Console do Firebase.
       allow write: if false;
     }
   }
