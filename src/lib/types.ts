@@ -25,7 +25,7 @@ export type Registration = {
     id: string;
     adventureId: string;
     adventureTitle: string;
-    name: string;
+    name:string;
     email: string;
     phone: string;
     registrationDate: string;
@@ -46,4 +46,8 @@ export type ContentPage = {
   slug: string;
   title: string;
   content: string;
+};
+
+export type AdminRole = {
+  isAdmin: boolean;
 };

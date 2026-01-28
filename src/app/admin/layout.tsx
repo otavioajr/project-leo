@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   SidebarProvider,
   Sidebar,
@@ -12,9 +12,12 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Mountain, LayoutDashboard, Compass, ListChecks, Home, FileText } from "lucide-react";
+import { Mountain, LayoutDashboard, Compass, ListChecks, Home, FileText, LoaderCircle, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useAuth, useUser } from "@/firebase";
 
 const navItems = [
   { href: "/admin", label: "Painel", icon: LayoutDashboard },
@@ -30,6 +33,43 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isUserLoading } = useUser();
+  const { isAdmin, isAdminLoading } = useIsAdmin();
+  const auth = useAuth();
+
+  const handleSignOut = async () => {
+    await auth.signOut();
+    router.push('/login');
+  };
+  
+  if (isUserLoading || isAdminLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    if (typeof window !== 'undefined') {
+        router.replace('/login');
+    }
+    return null; // Render nothing while redirecting
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background p-4 text-center">
+        <h1 className="text-2xl font-bold font-headline text-destructive">Acesso Negado</h1>
+        <p className="max-w-md text-muted-foreground">Você está autenticado, mas não tem permissão de administrador para ver esta página. Peça para um administrador conceder a você acesso ou tente com outra conta.</p>
+        <div className="flex gap-4">
+             <Button onClick={() => router.push('/')}>Voltar para a Home</Button>
+            <Button variant="outline" onClick={handleSignOut}>Sair e tentar novamente</Button>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <SidebarProvider>
@@ -62,6 +102,16 @@ export default function AdminLayout({
             ))}
           </SidebarMenu>
         </SidebarContent>
+        <SidebarFooter className="mt-auto">
+            <SidebarMenu>
+                <SidebarMenuItem>
+                    <SidebarMenuButton onClick={handleSignOut}>
+                        <LogOut/>
+                        <span>Sair</span>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+            </SidebarMenu>
+        </SidebarFooter>
       </Sidebar>
       <SidebarInset>
         <header className="flex h-16 items-center gap-4 border-b bg-background px-6">

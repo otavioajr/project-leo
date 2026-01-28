@@ -31,7 +31,11 @@ service cloud.firestore {
     }
     
     match /roles_admin/{userId} {
-      allow read, write: if false;
+      // A user can check their own admin status.
+      allow read: if request.auth.uid == userId;
+      // Writes are disallowed from the client to prevent privilege escalation.
+      // Admins should be managed from the Firebase Console.
+      allow write: if false;
     }
   }
 }
