@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import {
   SidebarProvider,
   Sidebar,
@@ -38,6 +39,12 @@ export default function AdminLayout({
   const { isAdmin, isAdminLoading } = useIsAdmin();
   const auth = useAuth();
 
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.replace('/login');
+    }
+  }, [isUserLoading, user, router]);
+
   const handleSignOut = async () => {
     await auth.signOut();
     router.push('/login');
@@ -52,10 +59,9 @@ export default function AdminLayout({
   }
 
   if (!user) {
-    if (typeof window !== 'undefined') {
-        router.replace('/login');
-    }
-    return null; // Render nothing while redirecting
+    // A lógica de redirecionamento agora está no useEffect.
+    // Retornamos null aqui para evitar renderizar o conteúdo administrativo.
+    return null;
   }
 
   if (!isAdmin) {
