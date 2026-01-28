@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { HomePageContent } from "@/lib/types";
-import { saveHomePageContent } from "@/lib/actions/admin-actions";
+import { useFirebase } from "@/firebase";
+import { doc, setDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +44,7 @@ export function HomePageForm({ content }: HomePageFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { firestore } = useFirebase();
 
   const form = useForm<HomePageFormValues>({
     resolver: zodResolver(homePageContentSchema),
@@ -51,21 +53,24 @@ export function HomePageForm({ content }: HomePageFormProps) {
 
   async function onSubmit(values: HomePageFormValues) {
     setIsSubmitting(true);
-    const result = await saveHomePageContent(values);
-
-    if (result.success) {
+    
+    try {
+      const contentRef = doc(firestore, 'content', 'homepage');
+      await setDoc(contentRef, values, { merge: true });
       toast({
         title: "Página Principal Atualizada",
         description: `O conteúdo foi salvo com sucesso.`,
       });
       router.refresh();
-    } else {
+    } catch (error) {
+      console.error(error);
       toast({
         title: "Falha ao Salvar",
-        description: result.message || "Algo deu errado.",
+        description: "Algo deu errado.",
         variant: "destructive",
       });
     }
+
     setIsSubmitting(false);
   }
 

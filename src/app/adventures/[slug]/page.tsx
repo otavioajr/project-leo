@@ -1,23 +1,52 @@
-import { getAdventureBySlug } from '@/lib/data';
-import { notFound } from 'next/navigation';
+"use client";
+
+import { notFound, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Timer, BarChart, MapPin, Info } from 'lucide-react';
+import { DollarSign, Timer, BarChart, MapPin, Info, LoaderCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RegistrationForm } from './_components/registration-form';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, where, limit } from 'firebase/firestore';
+import type { Adventure } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
-type AdventurePageProps = {
-  params: {
-    slug: string;
-  };
-};
+export default function AdventurePage() {
+  const params = useParams();
+  const slug = params.slug as string;
+  const firestore = useFirestore();
 
-export default async function AdventurePage({ params }: AdventurePageProps) {
-  const adventure = await getAdventureBySlug(params.slug);
+  const adventureQuery = useMemoFirebase(() => {
+    if (!slug) return null;
+    return query(collection(firestore, 'adventures'), where('slug', '==', slug), limit(1));
+  }, [firestore, slug]);
+  
+  const { data: adventures, isLoading } = useCollection<Adventure>(adventureQuery);
+  
+  const adventure = adventures?.[0];
+
+  if (isLoading) {
+    return (
+        <div className="container mx-auto px-6 py-12">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
+                <div className="lg:col-span-3">
+                    <Skeleton className="h-[400px] md:h-[500px] w-full mb-8 rounded-lg" />
+                    <Skeleton className="h-10 w-3/4 mb-4" />
+                    <Skeleton className="h-6 w-full mb-2" />
+                    <Skeleton className="h-6 w-full mb-2" />
+                    <Skeleton className="h-6 w-3/4" />
+                </div>
+                <div className="lg:col-span-2">
+                    <Skeleton className="h-96 w-full rounded-lg" />
+                </div>
+            </div>
+        </div>
+    );
+  }
 
   if (!adventure) {
-    notFound();
+    return notFound();
   }
 
   const difficultyVariant = {
@@ -69,7 +98,7 @@ export default async function AdventurePage({ params }: AdventurePageProps) {
                 </div>
                  <div className="flex items-center gap-3">
                   <BarChart className="h-5 w-5 text-primary" />
-                  <Badge variant={difficultyVariant[adventure.difficulty]} className="text-sm">
+                  <Badge variant={difficultyVariant[adventure.difficulty]}>
                     {adventure.difficulty}
                   </Badge>
                 </div>

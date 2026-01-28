@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { ContentPage } from "@/lib/types";
-import { saveContentPage } from "@/lib/actions/admin-actions";
+import { useFirebase } from "@/firebase";
+import { doc, setDoc } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +39,7 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { firestore } = useFirebase();
 
   const form = useForm<ContentPageFormValues>({
     resolver: zodResolver(contentPageSchema),
@@ -46,21 +48,24 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
 
   async function onSubmit(values: ContentPageFormValues) {
     setIsSubmitting(true);
-    const result = await saveContentPage(values);
-
-    if (result.success) {
+    
+    try {
+      const pageRef = doc(firestore, 'pages', values.slug);
+      await setDoc(pageRef, values, { merge: true });
       toast({
         title: "Página Atualizada",
         description: `A página "${values.title}" foi salva com sucesso.`,
       });
       router.refresh();
-    } else {
+    } catch (error) {
+       console.error("Failed to save content page:", error);
       toast({
         title: "Falha ao Salvar",
-        description: result.message || "Algo deu errado.",
+        description: "Algo deu errado.",
         variant: "destructive",
       });
     }
+
     setIsSubmitting(false);
   }
 

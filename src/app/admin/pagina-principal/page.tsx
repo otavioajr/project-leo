@@ -1,9 +1,16 @@
-import { getHomePageContent } from "@/lib/data";
+"use client";
+
 import { HomePageForm } from "./_components/home-page-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
+import type { HomePageContent } from "@/lib/types";
+import { LoaderCircle } from "lucide-react";
 
-export default async function PaginaPrincipalPage() {
-  const content = await getHomePageContent();
+export default function PaginaPrincipalPage() {
+  const firestore = useFirestore();
+  const contentRef = useMemoFirebase(() => doc(firestore, 'content', 'homepage'), [firestore]);
+  const { data: content, isLoading } = useDoc<HomePageContent>(contentRef);
 
   return (
     <Card>
@@ -14,7 +21,12 @@ export default async function PaginaPrincipalPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <HomePageForm content={content} />
+        {isLoading && (
+            <div className="flex items-center justify-center p-8">
+                <LoaderCircle className="animate-spin" />
+            </div>
+        )}
+        {content && <HomePageForm content={content} />}
       </CardContent>
     </Card>
   );

@@ -1,4 +1,5 @@
-import { getAdventures, getRegistrations } from "@/lib/data";
+"use client";
+
 import {
   Card,
   CardContent,
@@ -13,23 +14,41 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Compass, ListChecks, User, Mail, Phone, Users } from "lucide-react";
+import { Compass, ListChecks, User, Mail, Phone, Users, LoaderCircle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, Timestamp } from "firebase/firestore";
+import type { Adventure, Registration } from "@/lib/types";
 
 function formatFieldName(name: string) {
     const words = name.replace(/_/g, ' ').split(' ');
     return words.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
+type FirestoreRegistration = Omit<Registration, 'registrationDate'> & {
+  registrationDate: Timestamp;
+};
 
-export default async function AdminDashboard() {
-  const adventures = await getAdventures();
-  const registrations = await getRegistrations();
+export default function AdminDashboard() {
+  const firestore = useFirestore();
   
-  const totalParticipants = registrations.reduce((acc, reg) => acc + reg.groupSize, 0);
+  const adventuresQuery = useMemoFirebase(() => collection(firestore, 'adventures'), [firestore]);
+  const registrationsQuery = useMemoFirebase(() => collection(firestore, 'registrations'), [firestore]);
 
-  const recentRegistrations = registrations.slice(0, 5);
+  const { data: adventures, isLoading: isLoadingAdventures } = useCollection<Adventure>(adventuresQuery);
+  const { data: registrations, isLoading: isLoadingRegistrations } = useCollection<FirestoreRegistration>(registrationsQuery);
+  
+  const totalParticipants = registrations?.reduce((acc, reg) => acc + reg.groupSize, 0) || 0;
+  const recentRegistrations = registrations?.slice(0, 5) || [];
+
+  if (isLoadingAdventures || isLoadingRegistrations) {
+    return (
+        <div className="flex items-center justify-center p-8">
+            <LoaderCircle className="animate-spin" />
+        </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -42,7 +61,7 @@ export default async function AdminDashboard() {
             <Compass className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{adventures.length}</div>
+            <div className="text-2xl font-bold">{adventures?.length || 0}</div>
             <p className="text-xs text-muted-foreground">
               aventuras ativas e rascunhos
             </p>
@@ -58,7 +77,7 @@ export default async function AdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{totalParticipants}</div>
             <p className="text-xs text-muted-foreground">
-              em {registrations.length} inscrições
+              em {registrations?.length || 0} inscrições
             </p>
           </CardContent>
         </Card>
@@ -106,7 +125,7 @@ export default async function AdminDashboard() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {format(new Date(reg.registrationDate), "PPP p", { locale: ptBR })}
+                      {format(reg.registrationDate.toDate(), "PPP p", { locale: ptBR })}
                     </TableCell>
                   </TableRow>
                 ))

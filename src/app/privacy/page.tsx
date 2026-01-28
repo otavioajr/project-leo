@@ -1,20 +1,39 @@
-import { getContentPageBySlug } from "@/lib/data";
+"use client";
+
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
+import type { ContentPage } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const page = await getContentPageBySlug('privacy');
-  if (!page) {
-    return {};
+
+// Metadata is now static or can be fetched in a parent Server Component if needed
+// export async function generateMetadata(): Promise<Metadata> {
+//   return {
+//     title: `Política de Privacidade | Chaves Adventure`,
+//   };
+// }
+
+export default function PrivacyPage() {
+  const firestore = useFirestore();
+  const pageRef = useMemoFirebase(() => doc(firestore, 'pages', 'privacy'), [firestore]);
+  const { data: page, isLoading } = useDoc<ContentPage>(pageRef);
+
+  if (isLoading) {
+    return (
+        <div className="container mx-auto px-6 py-12">
+            <div className="max-w-4xl mx-auto space-y-4">
+                <Skeleton className="h-10 w-1/3" />
+                <Skeleton className="h-8 w-1/4" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-8 w-1/4 mt-4" />
+                <Skeleton className="h-24 w-full" />
+            </div>
+        </div>
+    );
   }
-  return {
-    title: `${page.title} | Chaves Adventure`,
-  };
-}
-
-export default async function PrivacyPage() {
-  const page = await getContentPageBySlug('privacy');
-
+  
   if (!page) {
     notFound();
   }

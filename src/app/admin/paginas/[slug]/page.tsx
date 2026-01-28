@@ -1,14 +1,29 @@
-import { getContentPageBySlug } from "@/lib/data";
-import { notFound } from "next/navigation";
+"use client";
+
+import { notFound, useParams } from "next/navigation";
 import { ContentPageForm } from "../_components/content-page-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
+import type { ContentPage } from "@/lib/types";
+import { LoaderCircle } from "lucide-react";
 
-export default async function EditContentPage({
-  params,
-}: {
-  params: { slug: string };
-}) {
-  const page = await getContentPageBySlug(params.slug);
+
+export default function EditContentPage() {
+  const params = useParams();
+  const slug = params.slug as string;
+  const firestore = useFirestore();
+
+  const pageRef = useMemoFirebase(() => doc(firestore, 'pages', slug), [firestore, slug]);
+  const { data: page, isLoading } = useDoc<ContentPage>(pageRef);
+
+  if (isLoading) {
+    return (
+        <div className="flex items-center justify-center p-8">
+            <LoaderCircle className="animate-spin" />
+        </div>
+    )
+  }
 
   if (!page) {
     return notFound();

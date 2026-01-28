@@ -14,10 +14,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { registerForAdventure } from "@/lib/actions";
 import { useState, useEffect } from "react";
 import { Separator } from "@/components/ui/separator";
 import type { CustomField } from "@/lib/types";
+import { useFirebase } from "@/firebase";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 
 const participantSchema = z.object({
   name: z.string().min(2, "O nome do participante é obrigatório."),
@@ -43,6 +44,8 @@ type RegistrationFormProps = {
 export function RegistrationForm({ adventureId, adventureTitle, customFields }: RegistrationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { firestore } = useFirebase();
+
   const form = useForm<RegistrationFormValues>({
     resolver: zodResolver(registrationSchema),
     defaultValues: {
@@ -108,26 +111,29 @@ export function RegistrationForm({ adventureId, adventureTitle, customFields }: 
         return;
     }
 
-    const result = await registerForAdventure({
-      ...values,
-      adventureId,
-      adventureTitle,
-    });
+    try {
+      await addDoc(collection(firestore, "registrations"), {
+        ...values,
+        adventureId,
+        adventureTitle,
+        registrationDate: serverTimestamp(),
+      });
 
-    if (result.success) {
       toast({
         title: "Inscrição Realizada com Sucesso!",
         description: "Recebemos sua inscrição. Nos vemos na trilha!",
       });
       form.reset();
       remove();
-    } else {
+    } catch (error) {
+      console.error("Registration failed:", error);
       toast({
         title: "Falha na Inscrição",
-        description: result.message || "Algo deu errado. Por favor, tente novamente.",
+        description: "Algo deu errado. Por favor, tente novamente.",
         variant: "destructive",
       });
     }
+
     setIsSubmitting(false);
   }
 

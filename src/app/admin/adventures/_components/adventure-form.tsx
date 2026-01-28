@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { Adventure } from "@/lib/types";
-import { saveAdventure, deleteAdventure } from "@/lib/actions/admin-actions";
+import { useFirebase } from "@/firebase";
+import { doc, setDoc, addDoc, deleteDoc, collection } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -71,11 +72,23 @@ type AdventureFormProps = {
   adventure?: Adventure;
 };
 
+function createSlug(title: string) {
+  return title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
+
 export function AdventureForm({ adventure }: AdventureFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const { firestore } = useFirebase();
 
   const form = useForm<AdventureFormValues>({
     resolver: zodResolver(adventureSchema),
@@ -101,43 +114,57 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
 
   async function onSubmit(values: AdventureFormValues) {
     setIsSubmitting(true);
-    const result = await saveAdventure({ id: adventure?.id, ...values });
+    
+    const adventureData = {
+      ...values,
+      slug: createSlug(values.title),
+    };
 
-    if (result.success && result.adventure) {
+    try {
+      if (adventure?.id) {
+        const adventureRef = doc(firestore, "adventures", adventure.id);
+        await setDoc(adventureRef, adventureData, { merge: true });
+      } else {
+        await addDoc(collection(firestore, "adventures"), adventureData);
+      }
+      
       toast({
         title: adventure ? "Aventura Atualizada" : "Aventura Criada",
-        description: `"${result.adventure.title}" foi salva.`,
+        description: `"${values.title}" foi salva.`,
       });
       router.push("/admin/adventures");
-      router.refresh();
-    } else {
+      router.refresh(); // revalidate cache
+    } catch (error) {
+      console.error("Failed to save adventure:", error);
       toast({
         title: "Falha ao Salvar",
-        description: result.message || "Algo deu errado.",
+        description: "Algo deu errado.",
         variant: "destructive",
       });
     }
+
     setIsSubmitting(false);
   }
   
   async function handleDelete() {
     if (!adventure) return;
     setIsDeleting(true);
-    const result = await deleteAdventure(adventure.id);
-    if(result.success) {
-        toast({
+    try {
+      await deleteDoc(doc(firestore, "adventures", adventure.id));
+      toast({
             title: "Aventura Excluída",
             description: `"${adventure.title}" foi removida.`,
-        });
-        router.push("/admin/adventures");
-        router.refresh();
-    } else {
-        toast({
+      });
+      router.push("/admin/adventures");
+      router.refresh();
+    } catch (error) {
+      console.error("Failed to delete adventure:", error);
+      toast({
             title: "Falha na Exclusão",
             description: "Algo deu errado.",
             variant: "destructive",
-        });
-        setIsDeleting(false);
+      });
+      setIsDeleting(false);
     }
   }
 

@@ -1,5 +1,6 @@
+"use client";
+
 import Link from "next/link";
-import { getAdventures } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, MoreHorizontal } from "lucide-react";
+import { PlusCircle, MoreHorizontal, LoaderCircle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,9 +26,14 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
+import type { Adventure } from "@/lib/types";
 
-export default async function AdventuresPage() {
-  const adventures = await getAdventures();
+export default function AdventuresPage() {
+  const firestore = useFirestore();
+  const adventuresQuery = useMemoFirebase(() => collection(firestore, 'adventures'), [firestore]);
+  const { data: adventures, isLoading } = useCollection<Adventure>(adventuresQuery);
 
   return (
     <Card>
@@ -50,6 +56,12 @@ export default async function AdventuresPage() {
         </div>
       </CardHeader>
       <CardContent>
+        {isLoading && (
+            <div className="flex items-center justify-center p-8">
+                <LoaderCircle className="animate-spin" />
+            </div>
+        )}
+        {!isLoading && (
         <Table>
           <TableHeader>
             <TableRow>
@@ -63,7 +75,7 @@ export default async function AdventuresPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {adventures.length > 0 ? (
+            {adventures && adventures.length > 0 ? (
               adventures.map((adventure) => (
                 <TableRow key={adventure.id}>
                   <TableCell className="font-medium">{adventure.title}</TableCell>
@@ -104,6 +116,7 @@ export default async function AdventuresPage() {
             )}
           </TableBody>
         </Table>
+        )}
       </CardContent>
     </Card>
   );

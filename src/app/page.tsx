@@ -1,13 +1,69 @@
+"use client";
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AdventureCard } from '@/components/adventure-card';
-import { getAdventures, getHomePageContent } from '@/lib/data';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, LoaderCircle } from 'lucide-react';
+import { useCollection, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import type { Adventure, HomePageContent } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
-export default async function Home() {
-  const adventures = await getAdventures();
-  const homePageContent = await getHomePageContent();
+function HeroLoading() {
+  return (
+    <section className="relative h-[60vh] md:h-[80vh] w-full bg-muted">
+      <div className="relative z-10 flex h-full flex-col items-center justify-center text-center text-white p-6">
+        <Skeleton className="h-12 w-3/4 mb-4" />
+        <Skeleton className="h-6 w-1/2" />
+        <Skeleton className="h-12 w-48 mt-8" />
+      </div>
+    </section>
+  );
+}
+
+function AdventuresLoading() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="flex flex-col space-y-3">
+          <Skeleton className="h-[200px] w-full rounded-xl" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+export default function Home() {
+  const firestore = useFirestore();
+
+  const adventuresQuery = useMemoFirebase(() => collection(firestore, 'adventures'), [firestore]);
+  const homePageContentRef = useMemoFirebase(() => doc(firestore, 'content', 'homepage'), [firestore]);
+
+  const { data: adventures, isLoading: isLoadingAdventures } = useCollection<Adventure>(adventuresQuery);
+  const { data: homePageContent, isLoading: isLoadingContent } = useDoc<HomePageContent>(homePageContentRef);
+
+  if (isLoadingContent || !homePageContent) {
+    return (
+      <div className="flex flex-col">
+        <HeroLoading />
+         <section id="adventures" className="py-12 md:py-24 bg-background">
+          <div className="container mx-auto px-6">
+            <div className="text-center mb-12">
+               <Skeleton className="h-10 w-1/2 mx-auto" />
+               <Skeleton className="h-5 w-3/4 mx-auto mt-2" />
+            </div>
+            <AdventuresLoading />
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col">
@@ -47,11 +103,14 @@ export default async function Home() {
               {homePageContent.adventuresDescription}
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {adventures.map((adventure) => (
-              <AdventureCard key={adventure.id} adventure={adventure} />
-            ))}
-          </div>
+           {isLoadingAdventures && <AdventuresLoading />}
+           {adventures && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {adventures.map((adventure) => (
+                <AdventureCard key={adventure.id} adventure={adventure} />
+                ))}
+            </div>
+           )}
         </div>
       </section>
     </div>

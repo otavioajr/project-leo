@@ -1,4 +1,5 @@
-import { getRegistrations } from "@/lib/data";
+"use client";
+
 import {
   Card,
   CardContent,
@@ -16,15 +17,32 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { User, Mail, Phone, Users } from "lucide-react";
+import { User, Mail, Phone, Users, LoaderCircle } from "lucide-react";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, Timestamp } from "firebase/firestore";
+import type { Registration } from "@/lib/types";
 
 function formatFieldName(name: string) {
     const words = name.replace(/_/g, ' ').split(' ');
     return words.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
-export default async function RegistrationsPage() {
-  const registrations = await getRegistrations();
+type FirestoreRegistration = Omit<Registration, 'registrationDate'> & {
+  registrationDate: Timestamp;
+};
+
+export default function RegistrationsPage() {
+  const firestore = useFirestore();
+  const registrationsQuery = useMemoFirebase(() => collection(firestore, 'registrations'), [firestore]);
+  const { data: registrations, isLoading } = useCollection<FirestoreRegistration>(registrationsQuery);
+
+  if (isLoading) {
+      return (
+        <div className="flex items-center justify-center p-8">
+            <LoaderCircle className="animate-spin" />
+        </div>
+      )
+  }
 
   return (
     <Card>
@@ -45,7 +63,7 @@ export default async function RegistrationsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {registrations.length > 0 ? (
+            {registrations && registrations.length > 0 ? (
               registrations.map((reg) => (
                 <TableRow key={reg.id}>
                   <TableCell className="font-medium">{reg.adventureTitle}</TableCell>
@@ -84,7 +102,7 @@ export default async function RegistrationsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {format(new Date(reg.registrationDate), "PPP p", { locale: ptBR })}
+                    {format(reg.registrationDate.toDate(), "PPP p", { locale: ptBR })}
                   </TableCell>
                 </TableRow>
               ))

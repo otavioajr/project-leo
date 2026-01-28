@@ -1,206 +1,89 @@
 {
   "entities": {
-    "Event": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Event",
+    "Adventure": {
+      "title": "Adventure",
+      "description": "Represents an adventure activity offered by Chaves Adventure.",
       "type": "object",
-      "description": "Represents an adventure event or activity offered by Alpina Adventures.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the event."
-        },
-        "title": {
-          "type": "string",
-          "description": "The title of the event (e.g., 'Mountain Climbing Expedition')."
-        },
-        "description": {
-          "type": "string",
-          "description": "Detailed description of the event, including itinerary and difficulty."
-        },
-        "imageUrl": {
-          "type": "string",
-          "description": "URL of the main image representing the event.",
-          "format": "uri"
-        },
-        "location": {
-          "type": "string",
-          "description": "The location where the event takes place."
-        },
-        "date": {
-          "type": "string",
-          "description": "The date and time of the event.",
-          "format": "date-time"
-        },
-        "duration": {
-          "type": "string",
-          "description": "The duration of the event (e.g., '3 days', '4 hours')."
-        },
-        "price": {
-          "type": "number",
-          "description": "The price of the event per participant."
-        },
-        "capacity": {
-          "type": "number",
-          "description": "The maximum number of participants allowed for the event."
-        },
-        "registrationFormId": {
-          "type": "string",
-          "description": "Reference to RegistrationForm. (Relationship: RegistrationForm 1:N Event)"
-        }
-      },
-      "required": [
-        "id",
-        "title",
-        "description",
-        "imageUrl",
-        "location",
-        "date",
-        "duration",
-        "price",
-        "capacity",
-        "registrationFormId"
-      ]
-    },
-    "RegistrationForm": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "RegistrationForm",
-      "type": "object",
-      "description": "Represents a registration form associated with an event.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the registration form."
-        },
-        "title": {
-          "type": "string",
-          "description": "The title of the registration form (e.g., 'Climbing Registration')."
-        },
-        "fields": {
+        "slug": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "longDescription": { "type": "string" },
+        "price": { "type": "number" },
+        "duration": { "type": "string" },
+        "location": { "type": "string" },
+        "difficulty": { "type": "string", "enum": ["Fácil", "Moderado", "Desafiador"] },
+        "imageUrl": { "type": "string", "format": "uri" },
+        "imageDescription": { "type": "string" },
+        "registrationsEnabled": { "type": "boolean" },
+        "customFields": {
           "type": "array",
-          "description": "Array of fields in the registration form.",
           "items": {
-            "type": "string"
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "label": { "type": "string" },
+              "type": { "type": "string", "enum": ["text", "email", "tel", "number"] },
+              "required": { "type": "boolean" }
+            },
+            "required": ["name", "label", "type", "required"]
           }
-        },
-        "enabled": {
-          "type": "boolean",
-          "description": "Indicates whether the registration form is currently enabled for use."
         }
       },
-      "required": [
-        "id",
-        "title",
-        "fields",
-        "enabled"
-      ]
+      "required": ["slug", "title", "description", "longDescription", "price", "duration", "location", "difficulty", "imageUrl", "imageDescription", "registrationsEnabled"]
     },
-    "UserRegistration": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "UserRegistration",
+    "Registration": {
+      "title": "Registration",
+      "description": "Represents a user's registration for an adventure.",
       "type": "object",
-      "description": "Represents a user's registration for a specific event.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user registration."
-        },
-        "eventId": {
-          "type": "string",
-          "description": "Reference to Event. (Relationship: Event 1:N UserRegistration)"
-        },
-        "userProfileId": {
-          "type": "string",
-          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N UserRegistration)"
-        },
-        "registrationDate": {
-          "type": "string",
-          "description": "The date and time when the user registered for the event.",
-          "format": "date-time"
-        },
-        "status": {
-          "type": "string",
-          "description": "The status of the registration (e.g., 'pending', 'confirmed', 'cancelled')."
-        },
-        "formData": {
-          "type": "string",
-          "description": "JSON string containing the form data submitted by the user."
+        "adventureId": { "type": "string" },
+        "adventureTitle": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "registrationDate": { "type": "string", "format": "date-time" },
+        "groupSize": { "type": "number" },
+        "participants": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": { "type": "string" } }
         }
       },
-      "required": [
-        "id",
-        "eventId",
-        "userProfileId",
-        "registrationDate",
-        "status",
-        "formData"
-      ]
+      "required": ["adventureId", "adventureTitle", "name", "email", "phone", "registrationDate", "groupSize"]
     },
-    "UserProfile": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "UserProfile",
+    "HomePageContent": {
+      "title": "Home Page Content",
+      "description": "Singleton document for the home page content.",
       "type": "object",
-      "description": "Represents a user profile.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user profile."
-        },
-        "firstName": {
-          "type": "string",
-          "description": "The first name of the user."
-        },
-        "lastName": {
-          "type": "string",
-          "description": "The last name of the user."
-        },
-        "email": {
-          "type": "string",
-          "description": "The email address of the user.",
-          "format": "email"
-        },
-        "phone": {
-          "type": "string",
-          "description": "The phone number of the user."
-        }
+        "heroTitle": { "type": "string" },
+        "heroDescription": { "type": "string" },
+        "heroImageUrl": { "type": "string", "format": "uri" },
+        "heroImageDescription": { "type": "string" },
+        "adventuresTitle": { "type": "string" },
+        "adventuresDescription": { "type": "string" }
       },
-      "required": [
-        "id",
-        "firstName",
-        "lastName",
-        "email",
-        "phone"
-      ]
+      "required": ["heroTitle", "heroDescription", "heroImageUrl", "heroImageDescription", "adventuresTitle", "adventuresDescription"]
     },
-    "ContentBlock": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ContentBlock",
+    "ContentPage": {
+      "title": "Content Page",
+      "description": "Represents a static content page like 'About' or 'Contact'.",
       "type": "object",
-      "description": "Represents a reusable content block that can be displayed on various pages.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the content block."
-        },
-        "title": {
-          "type": "string",
-          "description": "The title of the content block (e.g., 'About Us', 'Contact Information')."
-        },
-        "content": {
-          "type": "string",
-          "description": "The HTML content of the content block."
-        },
-        "type": {
-          "type": "string",
-          "description": "The type of the content block (e.g., 'text', 'image', 'video')."
-        }
+        "slug": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" }
       },
-      "required": [
-        "id",
-        "title",
-        "content",
-        "type"
-      ]
+      "required": ["slug", "title", "content"]
+    },
+    "AdminRole": {
+      "title": "Admin Role",
+      "description": "Document presence indicates admin role.",
+      "type": "object",
+      "properties": {
+        "isAdmin": { "type": "boolean" }
+      },
+      "required": ["isAdmin"]
     }
   },
   "auth": {
@@ -210,108 +93,25 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/events/{eventId}",
-        "definition": {
-          "entityName": "Event",
-          "schema": {
-            "$ref": "#/backend/entities/Event"
-          },
-          "description": "Stores event details. Admin only access.",
-          "params": [
-            {
-              "name": "eventId",
-              "description": "Unique identifier for the event."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/registration_forms/{registrationFormId}",
-        "definition": {
-          "entityName": "RegistrationForm",
-          "schema": {
-            "$ref": "#/backend/entities/RegistrationForm"
-          },
-          "description": "Stores registration form definitions. Admin only access.",
-          "params": [
-            {
-              "name": "registrationFormId",
-              "description": "Unique identifier for the registration form."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/events/{eventId}/user_registrations/{userRegistrationId}",
-        "definition": {
-          "entityName": "UserRegistration",
-          "schema": {
-            "$ref": "#/backend/entities/UserRegistration"
-          },
-          "description": "Stores user registrations for specific events.  Allows listing of registrations scoped to an event. Admin only access.",
-          "params": [
-            {
-              "name": "eventId",
-              "description": "The ID of the event."
-            },
-            {
-              "name": "userRegistrationId",
-              "description": "Unique identifier for the user registration."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/user_profiles/{userProfileId}",
-        "definition": {
-          "entityName": "UserProfile",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "Stores user profile information. Admin only access.",
-          "params": [
-            {
-              "name": "userProfileId",
-              "description": "Unique identifier for the user profile."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/content_blocks/{contentBlockId}",
-        "definition": {
-          "entityName": "ContentBlock",
-          "schema": {
-            "$ref": "#/backend/entities/ContentBlock"
-          },
-          "description": "Stores reusable content blocks for the CMS. Admin only access.",
-          "params": [
-            {
-              "name": "contentBlockId",
-              "description": "Unique identifier for the content block."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/roles_admin/{userId}",
-        "definition": {
-          "entityName": "AdminRole",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "Presence of document indicates admin role. Existence over content.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "User ID of the admin."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "This Firestore structure prioritizes authorization independence and simplifies security rules by denormalizing authorization data. It focuses on path-based ownership for user-specific data and uses structural segregation to maintain a homogeneous security posture within collections. The structure supports the core features of Alpina Adventures, including event management, user registrations, and dynamic content blocks. All data is owned by admins. QAPs are supported by segregating data based on access levels. Radically consistent naming helps with maintenance."
+    "/adventures/{adventureId}": {
+      "schema": { "$ref": "#/entities/Adventure" },
+      "description": "Stores adventure details."
+    },
+    "/registrations/{registrationId}": {
+      "schema": { "$ref": "#/entities/Registration" },
+      "description": "Stores user registrations for adventures."
+    },
+    "/content/homepage": {
+      "schema": { "$ref": "#/entities/HomePageContent" },
+      "description": "Stores the content for the main home page."
+    },
+    "/pages/{pageSlug}": {
+      "schema": { "$ref": "#/entities/ContentPage" },
+      "description": "Stores content for static pages."
+    },
+    "/roles_admin/{userId}": {
+      "schema": { "$ref": "#/entities/AdminRole" },
+      "description": "Manages administrator roles. Document existence implies admin rights."
+    }
   }
 }
