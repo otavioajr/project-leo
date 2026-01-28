@@ -2,37 +2,50 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // --- Helper Functions ---
     function isSignedIn() {
       return request.auth != null;
     }
 
     function isAdmin() {
+      // Check if the user is signed in and if a document for their UID exists in the 'roles_admin' collection.
       return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
+    // --- PUBLIC COLLECTIONS (Readable by anyone) ---
+
+    // Adventures can be read by anyone to be displayed on the site.
     match /adventures/{adventureId} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
     }
 
+    // Content for specific pages like the homepage can be read by anyone.
+    match /content/{docId} {
+       allow get: if true;
+       allow list, write: if isAdmin();
+    }
+
+    // Content pages can be read by anyone to build the site navigation and display page content.
+    match /pages/{pageSlug} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // --- ADMIN-ONLY & USER-SPECIFIC COLLECTIONS ---
+
+    // Registrations can only be created by signed-in users.
+    // Only admins can read, update, or delete them.
     match /registrations/{registrationId} {
       allow create: if isSignedIn();
       allow read, update, delete: if isAdmin();
     }
 
-    match /content/{docId} {
-       allow read: if true;
-       allow write: if isAdmin();
-    }
-
-    match /pages/{pageSlug} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-    
+    // Admin roles can only be read by the user themselves to check their own role.
+    // No one can write to this collection through client-side rules to prevent self-promotion to admin.
     match /roles_admin/{userId} {
-      allow read: if request.auth.uid == userId;
-      allow write: if false;
+      allow get: if request.auth.uid == userId;
+      allow list, create, update, delete: if false; // Deny listing all admins and any writes.
     }
   }
 }
