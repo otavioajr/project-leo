@@ -1,0 +1,147 @@
+/**
+ * @title Firebase Security Rules for Alpina Adventures (Prototyping)
+ * @version 1.0
+ *
+ * @description
+ * This ruleset enforces a strict Role-Based Access Control (RBAC) model. All data
+ * collections are considered administrative and can only be accessed or modified
+ * by authenticated users who are explicitly designated as admins.
+ *
+ * @philosophy
+ * Core Philosophy: The security model is "default deny." Access is only granted
+ * to users with a proven administrative role. There is no public or general
+ * user read/write access to any collection.
+ *
+ * Data Structure: Data is organized into top-level collections representing the
+ * core business entities (events, forms, content). A special collection,
+ * `/roles_admin`, is used to manage administrative privileges.
+ *
+ * Key Security Decisions:
+ * - Admin-Only Access: All data management is restricted to administrators.
+ * - Role Management: A user is considered an admin if a document with their UID
+ *   exists in the `/roles_admin` collection. This collection is locked down
+ *   and must be managed via the Firebase Console or a trusted server-side process.
+ * - No Public Data: There are no publicly readable collections.
+ * - Flexible Schema: In this prototyping phase, rules enforce authorization
+ *   (who can access what) but do not enforce the specific shape or type of data
+ *   being written, allowing for rapid development.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * Checks if the current user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the requesting user has an admin role.
+     * The role is granted if a document with their UID exists in the /roles_admin collection.
+     * This is a highly performant check.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    // ------------------------------------------------------------------------
+    // Administrative Collections
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Manages the list of administrators.
+     * @path /roles_admin/{userId}
+     * @allow (none) - This collection must only be managed from the Firebase Console or a trusted backend.
+     * @deny (any) - All client-side requests (read, create, update, delete) are denied.
+     * @principle Secures the root of trust. Prevents any client from escalating their own privileges.
+     */
+    match /roles_admin/{userId} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Stores event details.
+     * @path /events/{eventId}
+     * @allow (any) - An administrator can read, list, create, update, or delete any event.
+     * @deny (any) - Any non-administrator request is denied.
+     * @principle Enforces global admin control over core application data.
+     */
+    match /events/{eventId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    /**
+     * @description Stores registration form definitions.
+     * @path /registration_forms/{registrationFormId}
+     * @allow (any) - An administrator can read, list, create, update, or delete any registration form.
+     * @deny (any) - Any non-administrator request is denied.
+     * @principle Enforces global admin control over core application data.
+     */
+    match /registration_forms/{registrationFormId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    /**
+     * @description Stores user registrations for a specific event.
+     * @path /events/{eventId}/user_registrations/{userRegistrationId}
+     * @allow (any) - An administrator can read, list, create, update, or delete any user registration.
+     * @deny (any) - Any non-administrator request is denied.
+     * @principle Enforces global admin control over sensitive user registration data.
+     */
+    match /events/{eventId}/user_registrations/{userRegistrationId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    /**
+     * @description Stores user profile information.
+     * @path /user_profiles/{userProfileId}
+     * @allow (any) - An administrator can read, list, create, update, or delete any user profile.
+     * @deny (any) - Any non-administrator request is denied.
+     * @principle Enforces global admin control over user profile data.
+     */
+    match /user_profiles/{userProfileId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    /**
+     * @description Stores reusable content blocks for the CMS.
+     * @path /content_blocks/{contentBlockId}
+     * @allow (any) - An administrator can read, list, create, update, or delete any content block.
+     * @deny (any) - Any non-administrator request is denied.
+     * @principle Enforces global admin control over site content.
+     */
+    match /content_blocks/{contentBlockId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}
