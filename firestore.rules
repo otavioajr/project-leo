@@ -26,7 +26,7 @@ service cloud.firestore {
     }
 
     match /pages/{pageSlug} {
-      allow get, list: if true;
+      allow read: if true;
       allow write: if isAdmin();
     }
     
