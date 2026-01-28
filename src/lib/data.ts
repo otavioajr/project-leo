@@ -1,4 +1,4 @@
-import type { Adventure, Registration } from './types';
+import type { Adventure, Registration, HomePageContent } from './types';
 
 // Using a Map for easier CRUD operations
 let adventures: Map<string, Adventure> = new Map([
@@ -104,6 +104,15 @@ let registrations: Map<string, Registration> = new Map([
     }]
 ]);
 
+let homePageContent: HomePageContent = {
+  heroTitle: "Sua Próxima Aventura o Aguarda",
+  heroDescription: "Explore paisagens de tirar o fôlego e desafie-se com nossas experiências ao ar livre selecionadas.",
+  heroImageUrl: "https://images.unsplash.com/photo-1742578880683-806bb8a2a90e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxhZHZlbnR1cmUlMjBsYW5kc2NhcGV8ZW58MHx8fHwxNzY4NTY0NjM1fDA&ixlib=rb-4.1.0&q=80&w=1080",
+  heroImageDescription: "Uma deslumbrante cadeia de montanhas ao nascer do sol, com um caminhante solitário observando o vale.",
+  adventuresTitle: "Descubra Nossas Aventuras",
+  adventuresDescription: "De caminhadas serenas a escaladas emocionantes, encontre a experiência perfeita para você.",
+};
+
 // Simulate API latency
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -174,4 +183,15 @@ export async function deleteAdventure(id: string): Promise<{ success: boolean }>
     const registrationsToDelete = Array.from(registrations.values()).filter(r => r.adventureId === id);
     registrationsToDelete.forEach(r => registrations.delete(r.id));
     return { success: deleted };
+}
+
+export async function getHomePageContent(): Promise<HomePageContent> {
+    await delay(50);
+    return homePageContent;
+}
+
+export async function saveHomePageContent(content: HomePageContent): Promise<HomePageContent> {
+    await delay(500);
+    homePageContent = { ...content };
+    return homePageContent;
 }

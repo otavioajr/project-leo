@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { saveAdventure as dbSaveAdventure, deleteAdventure as dbDeleteAdventure } from "../data";
+import { saveAdventure as dbSaveAdventure, deleteAdventure as dbDeleteAdventure, saveHomePageContent as dbSaveHomePageContent } from "../data";
 import { revalidatePath } from "next/cache";
 
 const customFieldSchema = z.object({
@@ -58,5 +58,32 @@ export async function deleteAdventure(id: string) {
   } catch (error) {
     console.error("Failed to delete adventure:", error);
     return { success: false, message: "Não foi possível excluir a aventura." };
+  }
+}
+
+const homePageContentSchema = z.object({
+    heroTitle: z.string().min(1, "O título do herói é obrigatório."),
+    heroDescription: z.string().min(1, "A descrição do herói é obrigatória."),
+    heroImageUrl: z.string().url("A URL da imagem do herói é inválida."),
+    heroImageDescription: z.string().min(1, "A descrição da imagem do herói é obrigatória."),
+    adventuresTitle: z.string().min(1, "O título das aventuras é obrigatório."),
+    adventuresDescription: z.string().min(1, "A descrição das aventuras é obrigatória."),
+});
+
+export async function saveHomePageContent(data: unknown) {
+  const parsed = homePageContentSchema.safeParse(data);
+
+  if (!parsed.success) {
+    return { success: false, message: "Dados da página principal inválidos.", errors: parsed.error.issues };
+  }
+
+  try {
+    await dbSaveHomePageContent(parsed.data);
+    revalidatePath("/");
+    revalidatePath("/admin/pagina-principal");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to save home page content:", error);
+    return { success: false, message: "Não foi possível salvar o conteúdo da página principal." };
   }
 }

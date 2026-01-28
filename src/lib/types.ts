@@ -32,3 +32,12 @@ export type Registration = {
     groupSize: number;
     participants?: Record<string, string>[];
 };
+
+export type HomePageContent = {
+  heroTitle: string;
+  heroDescription: string;
+  heroImageUrl: string;
+  heroImageDescription: string;
+  adventuresTitle: string;
+  adventuresDescription: string;
+};

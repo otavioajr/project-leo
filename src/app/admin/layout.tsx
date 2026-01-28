@@ -13,13 +13,14 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Mountain, LayoutDashboard, Compass, ListChecks } from "lucide-react";
+import { Mountain, LayoutDashboard, Compass, ListChecks, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/admin", label: "Painel", icon: LayoutDashboard },
   { href: "/admin/adventures", label: "Aventuras", icon: Compass },
   { href: "/admin/registrations", label: "Inscrições", icon: ListChecks },
+  { href: "/admin/pagina-principal", label: "Página Principal", icon: Home },
 ];
 
 export default function AdminLayout({
