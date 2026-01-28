@@ -12,6 +12,17 @@ export default function PaginaPrincipalPage() {
   const contentRef = useMemoFirebase(() => doc(firestore, 'content', 'homepage'), [firestore]);
   const { data: content, isLoading } = useDoc<HomePageContent>(contentRef);
 
+  const defaultContent: HomePageContent = {
+    heroTitle: '',
+    heroDescription: '',
+    heroImageUrl: '',
+    heroImageDescription: '',
+    adventuresTitle: '',
+    adventuresDescription: '',
+  };
+  
+  const currentContent = content || defaultContent;
+
   return (
     <Card>
       <CardHeader>
@@ -21,12 +32,13 @@ export default function PaginaPrincipalPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading && (
+        {isLoading ? (
             <div className="flex items-center justify-center p-8">
                 <LoaderCircle className="animate-spin" />
             </div>
+        ) : (
+            <HomePageForm content={currentContent} />
         )}
-        {content && <HomePageForm content={content} />}
       </CardContent>
     </Card>
   );

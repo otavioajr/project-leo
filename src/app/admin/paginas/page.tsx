@@ -17,16 +17,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Edit, LoaderCircle } from "lucide-react";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection } from "firebase/firestore";
-import type { ContentPage } from "@/lib/types";
+import { Edit } from "lucide-react";
+
+const staticPages = [
+    { slug: 'about', title: 'Sobre Nós' },
+    { slug: 'contact', title: 'Contato' },
+    { slug: 'privacy', title: 'Política de Privacidade' },
+];
 
 export default function PaginasPage() {
-  const firestore = useFirestore();
-  const pagesQuery = useMemoFirebase(() => collection(firestore, 'pages'), [firestore]);
-  const { data: pages, isLoading } = useCollection<ContentPage>(pagesQuery);
-
   return (
     <Card>
       <CardHeader>
@@ -36,12 +35,6 @@ export default function PaginasPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading && (
-            <div className="flex items-center justify-center p-8">
-                <LoaderCircle className="animate-spin" />
-            </div>
-        )}
-        {!isLoading && (
         <Table>
           <TableHeader>
             <TableRow>
@@ -52,8 +45,7 @@ export default function PaginasPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {pages && pages.length > 0 ? (
-              pages.map((page) => (
+            {staticPages.map((page) => (
                 <TableRow key={page.slug}>
                   <TableCell className="font-medium">{page.title}</TableCell>
                   <TableCell className="text-right">
@@ -65,17 +57,9 @@ export default function PaginasPage() {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={2} className="text-center">
-                  Nenhuma página encontrada.
-                </TableCell>
-              </TableRow>
-            )}
+              ))}
           </TableBody>
         </Table>
-        )}
       </CardContent>
     </Card>
   );
