@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, notFound } from "next/navigation";
 import { ContentPageForm } from "../_components/content-page-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
@@ -8,14 +8,6 @@ import { doc } from "firebase/firestore";
 import type { ContentPage } from "@/lib/types";
 import { LoaderCircle } from "lucide-react";
 
-function getPageTitle(slug: string): string {
-    switch(slug) {
-        case 'about': return 'Sobre Nós';
-        case 'contact': return 'Contato';
-        case 'privacy': return 'Política de Privacidade';
-        default: return 'Página';
-    }
-}
 
 export default function EditContentPage() {
   const params = useParams();
@@ -33,22 +25,20 @@ export default function EditContentPage() {
     )
   }
 
-  const currentPage: ContentPage = page || {
-      slug: slug,
-      title: getPageTitle(slug),
-      content: ''
-  };
+  if (!page) {
+    return notFound();
+  }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Editar Página: {page?.title || getPageTitle(slug)}</CardTitle>
+        <CardTitle>Editar Página: {page?.title}</CardTitle>
         <CardDescription>
           Atualize o título e o conteúdo da página.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ContentPageForm page={currentPage} />
+        <ContentPageForm page={page} />
       </CardContent>
     </Card>
   );

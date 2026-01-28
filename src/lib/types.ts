@@ -34,6 +34,7 @@ export type Registration = {
 };
 
 export type HomePageContent = {
+  id?: string;
   heroTitle: string;
   heroDescription: string;
   heroImageUrl: string;
@@ -43,9 +44,12 @@ export type HomePageContent = {
 };
 
 export type ContentPage = {
+  id: string;
   slug: string;
   title: string;
   content: string;
+  showInHeader: boolean;
+  navOrder?: number;
 };
 
 export type AdminRole = {

@@ -72,9 +72,11 @@
       "properties": {
         "slug": { "type": "string" },
         "title": { "type": "string" },
-        "content": { "type": "string" }
+        "content": { "type": "string" },
+        "showInHeader": { "type": "boolean" },
+        "navOrder": { "type": "number" }
       },
-      "required": ["slug", "title", "content"]
+      "required": ["slug", "title", "content", "showInHeader"]
     },
     "AdminRole": {
       "title": "Admin Role",

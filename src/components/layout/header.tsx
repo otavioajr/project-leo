@@ -11,16 +11,35 @@ import {
 } from "@/components/ui/sheet";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, query, where, orderBy } from "firebase/firestore";
+import type { ContentPage } from "@/lib/types";
+import { Skeleton } from "../ui/skeleton";
 
-const navLinks = [
+
+const staticLinks = [
   { href: "/", label: "Início" },
   { href: "/#adventures", label: "Aventuras" },
-  { href: "/about", label: "Sobre" },
-  { href: "/contact", label: "Contato" },
 ];
 
 export function Header() {
   const pathname = usePathname();
+  const firestore = useFirestore();
+
+  const pagesQuery = useMemoFirebase(() => {
+    return query(
+        collection(firestore, 'pages'), 
+        where('showInHeader', '==', true),
+        orderBy('navOrder', 'asc')
+    );
+  }, [firestore]);
+  
+  const { data: dynamicPages, isLoading } = useCollection<ContentPage>(pagesQuery);
+
+  const navLinks = [
+    ...staticLinks,
+    ...(dynamicPages?.map(p => ({ href: `/pages/${p.slug}`, label: p.title })) || [])
+  ];
 
   const NavLink = ({ href, label }: { href: string; label: string }) => {
     const isActive = pathname === href;
@@ -65,9 +84,15 @@ export function Header() {
         </div>
 
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-          {navLinks.map((link) => (
-            <NavLink key={link.href} {...link} />
-          ))}
+          {isLoading ? (
+             <div className="flex items-center gap-6">
+                {[...Array(4)].map((_,i) => <Skeleton key={i} className="h-4 w-20" />)}
+             </div>
+          ) : (
+            navLinks.map((link) => (
+                <NavLink key={link.href} {...link} />
+            ))
+          )}
         </nav>
 
         <div className="flex-1 flex justify-end">

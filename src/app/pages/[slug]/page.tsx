@@ -1,25 +1,12 @@
 "use client";
 
-import { notFound } from "next/navigation";
-import type { Metadata } from "next";
-import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { notFound, useParams } from "next/navigation";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, query, where, limit } from "firebase/firestore";
 import type { ContentPage } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Metadata is now static or can be fetched in a parent Server Component if needed
-// export async function generateMetadata(): Promise<Metadata> {
-//   return {
-//     title: `Contato | Chaves Adventure`,
-//   };
-// }
-
-export default function ContactPage() {
-  const firestore = useFirestore();
-  const pageRef = useMemoFirebase(() => doc(firestore, 'pages', 'contact'), [firestore]);
-  const { data: page, isLoading } = useDoc<ContentPage>(pageRef);
-
-  if (isLoading) {
+function PageLoading() {
     return (
         <div className="container mx-auto px-6 py-12">
             <div className="max-w-4xl mx-auto space-y-4">
@@ -31,6 +18,23 @@ export default function ContactPage() {
             </div>
         </div>
     );
+}
+
+export default function DynamicPage() {
+  const params = useParams();
+  const slug = params.slug as string;
+  const firestore = useFirestore();
+
+  const pageQuery = useMemoFirebase(() => {
+    if (!slug) return null;
+    return query(collection(firestore, 'pages'), where('slug', '==', slug), limit(1));
+  }, [firestore, slug]);
+
+  const { data: pages, isLoading } = useCollection<ContentPage>(pageQuery);
+  const page = pages?.[0];
+
+  if (isLoading) {
+    return <PageLoading />;
   }
 
   if (!page) {
