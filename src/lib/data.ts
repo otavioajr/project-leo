@@ -113,13 +113,17 @@ let homePageContent: HomePageContent = {
   adventuresDescription: "De caminhadas serenas a escaladas emocionantes, encontre a experiência perfeita para você.",
 };
 
+const aboutContent = `<h2>Nossa História</h2><p>A Chaves Adventure nasceu da paixão pelas montanhas e pelo desejo de compartilhar a beleza da natureza com os outros. O que começou como um pequeno grupo de amigos guiando passeios de fim de semana se transformou em uma empresa de aventura completa, oferecendo uma ampla gama de atividades para todos os níveis de habilidade.</p><h2>Nossa Missão</h2><p>Nossa missão é fornecer experiências ao ar livre seguras, agradáveis e inesquecíveis. Acreditamos no poder transformador da natureza e nos esforçamos para criar aventuras que desafiam e inspiram. Estamos comprometidos com práticas sustentáveis e com a proteção dos belos ambientes onde operamos.</p><h2>Conheça a Equipe</h2><ul><li><strong>Carlos Chaves:</strong> Fundador e Guia Principal</li><li><strong>Ana Pereira:</strong> Gerente de Operações</li><li><strong>Bruno Costa:</strong> Instrutor de Escalada</li></ul>`;
+const contactContent = `<h2>Fale Conosco</h2><p>Tem alguma pergunta sobre nossas aventuras? Quer agendar um passeio privado? Adoraríamos ouvir de você!</p><ul><li><strong>Email:</strong> contato@chavesadventure.com</li><li><strong>Telefone:</strong> (11) 98765-4321</li><li><strong>Endereço:</strong> Rua das Montanhas, 123, Base da Montanha, BR</li></ul><p>Você também pode preencher o formulário abaixo e entraremos em contato o mais breve possível.</p>`;
+const privacyContent = `<h2>Sua Privacidade é Importante</h2><p>Esta política de privacidade descreve como a Chaves Adventure coleta, usa e protege qualquer informação que você nos fornece ao usar este site. Estamos comprometidos em garantir que sua privacidade seja protegida.</p><h2>O que coletamos</h2><p>Podemos coletar as seguintes informações:</p><ul><li>Nome e informações de contato, incluindo endereço de e-mail</li><li>Informações demográficas, como CEP, preferências e interesses</li><li>Outras informações relevantes para pesquisas e/ou ofertas de clientes</li></ul><h2>O que fazemos com as informações que coletamos</h2><p>Exigimos essas informações para entender suas necessidades e fornecer um serviço melhor, e em particular pelos seguintes motivos:</p><ul><li>Manutenção de registros internos.</li><li>Podemos usar as informações para melhorar nossos produtos e serviços.</li><li>Podemos enviar periodicamente e-mails promocionais sobre novos produtos, ofertas especiais ou outras informações que achamos que você pode achar interessantes usando o endereço de e-mail que você forneceu.</li></ul>`;
+
 let contentPages: Map<string, ContentPage> = new Map([
     [
         'about',
         {
             slug: 'about',
             title: 'Sobre Nós',
-            content: '<h2>Nossa História</h2><p>A Alpina Aventuras nasceu da paixão pelas montanhas e pelo desejo de compartilhar a beleza da natureza com o mundo. Fundada por um grupo de guias experientes, nossa missão é proporcionar experiências ao ar livre seguras, memoráveis e emocionantes para todos os níveis de aventureiros.</p><h2>Nossa Equipe</h2><p>Nossos guias são certificados, apaixonados pelo que fazem e têm um profundo conhecimento da região. Estamos aqui para garantir que sua aventura seja nada menos que espetacular.</p>'
+            content: aboutContent,
         }
     ],
     [
@@ -127,7 +131,7 @@ let contentPages: Map<string, ContentPage> = new Map([
         {
             slug: 'contact',
             title: 'Entre em Contato',
-            content: '<h2>Tem alguma pergunta?</h2><p>Adoraríamos ouvir de você! Seja para saber mais sobre uma aventura específica, fazer uma reserva de grupo ou simplesmente dizer olá, nossa equipe está pronta para ajudar.</p><ul class="mt-4 space-y-2"><li><strong>Email:</strong> <a href="mailto:contato@alpinaaventuras.com">contato@alpinaaventuras.com</a></li><li><strong>Telefone:</strong> <a href="tel:+5599999999999">(99) 99999-9999</a></li><li><strong>Endereço:</strong> Rua da Montanha, 123, Vale Sereno</li></ul>'
+            content: contactContent,
         }
     ],
     [
@@ -135,106 +139,106 @@ let contentPages: Map<string, ContentPage> = new Map([
         {
             slug: 'privacy',
             title: 'Política de Privacidade',
-            content: '<h2>Coleta de Informações</h2><p>Coletamos informações que você nos fornece diretamente ao se registrar para uma aventura. Isso inclui seu nome, e-mail e telefone.</p><h2>Uso das Informações</h2><p>Usamos suas informações para processar suas inscrições, nos comunicarmos com você sobre sua aventura e, se você permitir, enviar novidades sobre futuras atividades.</p><h2>Compartilhamento de Informações</h2><p>Não compartilhamos suas informações pessoais com terceiros, exceto quando necessário para fornecer os serviços da aventura (por exemplo, com parceiros de seguro).</p>'
+            content: privacyContent,
         }
     ]
 ]);
 
-// Simulate API latency
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+function createSlug(title: string) {
+  return title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
+
+// SIMULATED API/DB CALLS
 
 export async function getAdventures(): Promise<Adventure[]> {
-  await delay(100);
   return Array.from(adventures.values());
 }
 
-export async function getAdventureBySlug(slug: string): Promise<Adventure | undefined> {
-    await delay(100);
-    return Array.from(adventures.values()).find(adv => adv.slug === slug);
+export async function getAdventureById(id: string): Promise<Adventure | undefined> {
+  return adventures.get(id);
 }
 
-export async function getAdventureById(id: string): Promise<Adventure | undefined> {
-    await delay(100);
-    return adventures.get(id);
+export async function getAdventureBySlug(slug: string): Promise<Adventure | undefined> {
+  return Array.from(adventures.values()).find(adv => adv.slug === slug);
+}
+
+export async function saveAdventure(adventureData: Omit<Adventure, 'id' | 'slug'> & { id?: string }): Promise<Adventure> {
+  const slug = createSlug(adventureData.title);
+  
+  if (adventureData.id) {
+    const existing = adventures.get(adventureData.id);
+    if (!existing) throw new Error('Adventure not found');
+    
+    const updatedAdventure = { ...existing, ...adventureData, slug };
+    adventures.set(adventureData.id, updatedAdventure);
+    return updatedAdventure;
+  }
+  
+  const newId = String(adventures.size + 1);
+  const newAdventure: Adventure = {
+    ...adventureData,
+    id: newId,
+    slug: slug,
+  };
+  adventures.set(newId, newAdventure);
+  return newAdventure;
+}
+
+export async function deleteAdventure(id: string): Promise<void> {
+    if (!adventures.has(id)) {
+        throw new Error('Adventure not found');
+    }
+    adventures.delete(id);
+    // In a real DB, you'd also delete associated registrations
+    const regsToDelete = Array.from(registrations.values()).filter(r => r.adventureId === id);
+    regsToDelete.forEach(r => registrations.delete(r.id));
 }
 
 export async function getRegistrations(): Promise<Registration[]> {
-    await delay(100);
-    return Array.from(registrations.values()).sort((a,b) => new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime());
+  return Array.from(registrations.values()).sort((a, b) => new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime());
 }
 
-export async function addRegistration(registration: Omit<Registration, 'id' | 'registrationDate'>): Promise<Registration> {
-    await delay(500);
-    const newId = (registrations.size + 1).toString();
-    const newRegistration: Registration = {
-        ...registration,
-        id: newId,
-        registrationDate: new Date().toISOString(),
-    };
-    registrations.set(newId, newRegistration);
-    return newRegistration;
+export async function addRegistration(registrationData: Omit<Registration, 'id' | 'registrationDate'>): Promise<Registration> {
+  const newId = String(registrations.size + 1);
+  const newRegistration: Registration = {
+    ...registrationData,
+    id: newId,
+    registrationDate: new Date().toISOString(),
+  };
+  registrations.set(newId, newRegistration);
+  return newRegistration;
 }
 
-export async function saveAdventure(adventure: Omit<Adventure, 'id' | 'slug' | 'imageDescription'> & { id?: string; imageDescription?: string }): Promise<Adventure> {
-    await delay(500);
-    if (adventure.id && adventures.has(adventure.id)) {
-        // Update
-        const existingAdventure = adventures.get(adventure.id)!;
-        const updatedAdventure: Adventure = { 
-            ...existingAdventure, 
-            ...adventure,
-            imageDescription: adventure.imageDescription || existingAdventure.imageDescription,
-            customFields: adventure.customFields || existingAdventure.customFields || []
-        };
-        adventures.set(adventure.id, updatedAdventure);
-        return updatedAdventure;
-    } else {
-        // Create
-        const newId = (adventures.size + 5).toString(); // use a higher start to avoid collision with initial data
-        const slug = adventure.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
-        const newAdventure: Adventure = {
-            ...(adventure as Omit<Adventure, 'id' | 'slug'>),
-            id: newId,
-            slug: `${slug}-${newId}`,
-            customFields: adventure.customFields || []
-        };
-        adventures.set(newId, newAdventure);
-        return newAdventure;
-    }
-}
-
-export async function deleteAdventure(id: string): Promise<{ success: boolean }> {
-    await delay(500);
-    const deleted = adventures.delete(id);
-    // Also remove related registrations
-    const registrationsToDelete = Array.from(registrations.values()).filter(r => r.adventureId === id);
-    registrationsToDelete.forEach(r => registrations.delete(r.id));
-    return { success: deleted };
-}
 
 export async function getHomePageContent(): Promise<HomePageContent> {
-    await delay(50);
-    return homePageContent;
+  return homePageContent;
 }
 
 export async function saveHomePageContent(content: HomePageContent): Promise<HomePageContent> {
-    await delay(500);
-    homePageContent = { ...content };
+    homePageContent = content;
     return homePageContent;
 }
 
+
 export async function getContentPages(): Promise<ContentPage[]> {
-    await delay(50);
-    return Array.from(contentPages.values());
+  return Array.from(contentPages.values());
 }
 
 export async function getContentPageBySlug(slug: string): Promise<ContentPage | undefined> {
-    await delay(50);
-    return contentPages.get(slug);
+  return contentPages.get(slug);
 }
 
-export async function saveContentPage(page: ContentPage): Promise<ContentPage> {
-    await delay(500);
-    contentPages.set(page.slug, page);
-    return page;
+export async function saveContentPage(pageData: ContentPage): Promise<ContentPage> {
+    if (!contentPages.has(pageData.slug)) {
+        throw new Error('Page not found');
+    }
+    contentPages.set(pageData.slug, pageData);
+    return pageData;
 }

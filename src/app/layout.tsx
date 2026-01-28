@@ -6,7 +6,7 @@ import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 
 export const metadata: Metadata = {
-  title: 'Alpina Aventuras',
+  title: 'Chaves Adventure',
   description: 'Sua próxima aventura começa aqui. Descubra e reserve atividades ao ar livre.',
 };
 

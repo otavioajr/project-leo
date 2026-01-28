@@ -8,7 +8,7 @@ export async function generateMetadata(): Promise<Metadata> {
     return {};
   }
   return {
-    title: `${page.title} | Alpina Aventuras`,
+    title: `${page.title} | Chaves Adventure`,
   };
 }
 
