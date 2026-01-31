@@ -12,6 +12,8 @@ export default {
       fontFamily: {
         body: ['"Open Sans"', 'sans-serif'],
         headline: ['"Montserrat"', 'sans-serif'],
+        brand: ['"ZCOOL KuaiLe"', 'sans-serif'],
+        adventure: ['"Ketimun"', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {

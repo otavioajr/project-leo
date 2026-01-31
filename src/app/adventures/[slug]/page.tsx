@@ -158,7 +158,9 @@ export default function AdventurePage() {
                 <CardContent>
                   <RegistrationForm 
                     adventureId={adventure.id} 
-                    adventureTitle={adventure.title} 
+                    adventureTitle={adventure.title}
+                    adventureSlug={adventure.slug}
+                    adventurePrice={adventure.price}
                     customFields={adventure.customFields} 
                   />
                 </CardContent>

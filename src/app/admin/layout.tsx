@@ -15,7 +15,7 @@ import {
   SidebarTrigger,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Mountain, LayoutDashboard, Compass, ListChecks, Home, FileText, LoaderCircle, LogOut } from "lucide-react";
+import { Mountain, LayoutDashboard, Compass, ListChecks, Home, FileText, LoaderCircle, LogOut, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useAuth, useUser } from "@/firebase";
@@ -26,6 +26,7 @@ const navItems = [
   { href: "/admin/registrations", label: "Inscrições", icon: ListChecks },
   { href: "/admin/pagina-principal", label: "Página Principal", icon: Home },
   { href: "/admin/paginas", label: "Páginas", icon: FileText },
+  { href: "/admin/configuracao-pix", label: "Configuração PIX", icon: QrCode },
 ];
 
 export default function AdminLayout({

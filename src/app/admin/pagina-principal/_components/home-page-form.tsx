@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 
 
 const homePageContentSchema = z.object({
@@ -32,6 +33,22 @@ const homePageContentSchema = z.object({
     heroImageDescription: z.string().min(1, "A descrição da imagem do herói é obrigatória."),
     adventuresTitle: z.string().min(1, "O título das aventuras é obrigatório."),
     adventuresDescription: z.string().min(1, "A descrição das aventuras é obrigatória."),
+    // Redes Sociais
+    facebookUrl: z.string().optional(),
+    facebookEnabled: z.boolean().optional(),
+    instagramUrl: z.string().optional(),
+    instagramEnabled: z.boolean().optional(),
+    twitterUrl: z.string().optional(),
+    twitterEnabled: z.boolean().optional(),
+}).refine((data) => !data.facebookEnabled || (data.facebookUrl && data.facebookUrl.length > 0), {
+    message: "URL do Facebook é obrigatório quando habilitado.",
+    path: ["facebookUrl"],
+}).refine((data) => !data.instagramEnabled || (data.instagramUrl && data.instagramUrl.length > 0), {
+    message: "URL do Instagram é obrigatório quando habilitado.",
+    path: ["instagramUrl"],
+}).refine((data) => !data.twitterEnabled || (data.twitterUrl && data.twitterUrl.length > 0), {
+    message: "URL do Twitter é obrigatório quando habilitado.",
+    path: ["twitterUrl"],
 });
 
 type HomePageFormValues = z.infer<typeof homePageContentSchema>;
@@ -48,7 +65,15 @@ export function HomePageForm({ content }: HomePageFormProps) {
 
   const form = useForm<HomePageFormValues>({
     resolver: zodResolver(homePageContentSchema),
-    defaultValues: content,
+    defaultValues: {
+      ...content,
+      facebookUrl: content.facebookUrl ?? "",
+      facebookEnabled: content.facebookEnabled ?? false,
+      instagramUrl: content.instagramUrl ?? "",
+      instagramEnabled: content.instagramEnabled ?? false,
+      twitterUrl: content.twitterUrl ?? "",
+      twitterEnabled: content.twitterEnabled ?? false,
+    },
   });
 
   async function onSubmit(values: HomePageFormValues) {
@@ -164,6 +189,100 @@ export function HomePageForm({ content }: HomePageFormProps) {
                 </FormItem>
                 )}
             />
+        </div>
+
+        <Separator />
+
+        <h3 className="text-xl font-headline font-semibold">Redes Sociais</h3>
+        <p className="text-sm text-muted-foreground">Configure os links das redes sociais que aparecem no rodapé do site.</p>
+
+        <div className="space-y-6">
+          {/* Facebook */}
+          <div className="space-y-4 p-4 border rounded-lg">
+            <FormField
+              control={form.control}
+              name="facebookEnabled"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between">
+                  <FormLabel className="text-base font-medium">Facebook</FormLabel>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="facebookUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>URL do Facebook</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://facebook.com/suapagina" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Instagram */}
+          <div className="space-y-4 p-4 border rounded-lg">
+            <FormField
+              control={form.control}
+              name="instagramEnabled"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between">
+                  <FormLabel className="text-base font-medium">Instagram</FormLabel>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="instagramUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>URL do Instagram</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://instagram.com/seuperfil" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Twitter */}
+          <div className="space-y-4 p-4 border rounded-lg">
+            <FormField
+              control={form.control}
+              name="twitterEnabled"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between">
+                  <FormLabel className="text-base font-medium">Twitter</FormLabel>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="twitterUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>URL do Twitter</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://twitter.com/seuperfil" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
 
         <div className="flex justify-end mt-8">

@@ -25,12 +25,14 @@ export type Registration = {
     id: string;
     adventureId: string;
     adventureTitle: string;
-    name:string;
+    name: string;
     email: string;
     phone: string;
     registrationDate: string;
     groupSize: number;
     participants?: Record<string, string>[];
+    paymentStatus?: PaymentStatus;
+    totalAmount?: number;
 };
 
 export type HomePageContent = {
@@ -41,6 +43,13 @@ export type HomePageContent = {
   heroImageDescription: string;
   adventuresTitle: string;
   adventuresDescription: string;
+  // Redes Sociais
+  facebookUrl?: string;
+  facebookEnabled?: boolean;
+  instagramUrl?: string;
+  instagramEnabled?: boolean;
+  twitterUrl?: string;
+  twitterEnabled?: boolean;
 };
 
 export type ContentPage = {
@@ -55,3 +64,11 @@ export type ContentPage = {
 export type AdminRole = {
   isAdmin: boolean;
 };
+
+export type PixConfig = {
+  pixCopiaECola: string;
+  pixEnabled: boolean;
+  instructions?: string;
+};
+
+export type PaymentStatus = 'pending' | 'awaiting_confirmation' | 'confirmed';

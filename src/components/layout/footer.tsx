@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { Mountain } from "lucide-react";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, where, orderBy } from "firebase/firestore";
-import type { ContentPage } from "@/lib/types";
+import { useCollection, useDoc, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, doc } from "firebase/firestore";
+import type { ContentPage, HomePageContent } from "@/lib/types";
 
 export function Footer() {
   const firestore = useFirestore();
@@ -17,11 +17,9 @@ export function Footer() {
     ?.filter(p => p.showInHeader === true)
     ?.sort((a, b) => (a.navOrder ?? 0) - (b.navOrder ?? 0));
 
-  const socialLinks = [
-    { name: "Facebook", href: "#" },
-    { name: "Instagram", href: "#" },
-    { name: "Twitter", href: "#" },
-  ];
+  // Buscar configurações de redes sociais
+  const contentRef = useMemoFirebase(() => doc(firestore, 'content', 'homepage'), [firestore]);
+  const { data: homeContent } = useDoc<HomePageContent>(contentRef);
 
   return (
     <footer className="border-t bg-background">
@@ -29,7 +27,7 @@ export function Footer() {
         <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
           <Link href="/" className="flex items-center gap-2">
             <Mountain className="h-6 w-6 text-primary" />
-            <span className="font-bold font-headline">Chaves Adventure</span>
+            <span className="flex flex-col items-center justify-center"><span className="font-brand text-primary" style={{ height: '15px' }}>chaves</span><span className="font-adventure text-primary"> adventure</span></span>
           </Link>
           <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
             <Link href="/#adventures" className="hover:text-primary">Aventuras</Link>
@@ -43,11 +41,21 @@ export function Footer() {
             &copy; {new Date().getFullYear()} Chaves Adventure. Todos os direitos reservados.
           </p>
           <div className="flex items-center gap-4">
-            {socialLinks.map((link) => (
-              <a key={link.name} href={link.href} className="text-muted-foreground hover:text-primary">
-                {link.name}
+            {homeContent?.facebookEnabled && homeContent?.facebookUrl && (
+              <a href={homeContent.facebookUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
+                Facebook
               </a>
-            ))}
+            )}
+            {homeContent?.instagramEnabled && homeContent?.instagramUrl && (
+              <a href={homeContent.instagramUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
+                Instagram
+              </a>
+            )}
+            {homeContent?.twitterEnabled && homeContent?.twitterUrl && (
+              <a href={homeContent.twitterUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
+                Twitter
+              </a>
+            )}
           </div>
         </div>
       </div>

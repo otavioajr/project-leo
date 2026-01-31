@@ -77,7 +77,7 @@ export function Header() {
         <div className="flex-1">
             <Link href="/" className="flex items-center gap-2">
             <Mountain className="h-6 w-6 text-primary" />
-            <span className="font-bold text-lg font-headline">Chaves Adventure</span>
+            <span className="flex flex-col items-center justify-center"><span className="font-brand text-primary" style={{ fontSize: '30px', height: '30px' }}>chaves</span><span className="font-adventure text-primary"> adventure</span></span>
             </Link>
         </div>
 
@@ -112,7 +112,7 @@ export function Header() {
                 <div className="flex flex-col gap-4 py-8">
                     <Link href="/" className="mb-4 flex items-center gap-2 px-4">
                     <Mountain className="h-6 w-6 text-primary" />
-                    <span className="font-bold">Chaves Adventure</span>
+                    <span className="flex flex-col items-center justify-center"><span className="font-brand text-primary" style={{ fontSize: '30px', height: '30px' }}>chaves</span><span className="font-adventure text-primary"> adventure</span></span>
                     </Link>
                     <nav className="flex flex-col gap-2">
                     {navLinks.map((link) => (

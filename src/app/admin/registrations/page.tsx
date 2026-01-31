@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -15,17 +16,33 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { User, Mail, Phone, Users, LoaderCircle } from "lucide-react";
+import { User, Mail, Phone, Users, LoaderCircle, CheckCircle2, Clock, AlertCircle, DollarSign } from "lucide-react";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, Timestamp } from "firebase/firestore";
-import type { Registration } from "@/lib/types";
+import { collection, Timestamp, doc, updateDoc } from "firebase/firestore";
+import type { Registration, PaymentStatus } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
 
 function formatFieldName(name: string) {
     const words = name.replace(/_/g, ' ').split(' ');
     return words.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
+
+const paymentStatusConfig: Record<PaymentStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ElementType }> = {
+  pending: { label: "Pendente", variant: "outline", icon: AlertCircle },
+  awaiting_confirmation: { label: "Aguardando Confirmacao", variant: "secondary", icon: Clock },
+  confirmed: { label: "Confirmado", variant: "default", icon: CheckCircle2 },
+};
 
 type FirestoreRegistration = Omit<Registration, 'registrationDate'> & {
   registrationDate: Timestamp;
@@ -35,6 +52,30 @@ export default function RegistrationsPage() {
   const firestore = useFirestore();
   const registrationsQuery = useMemoFirebase(() => collection(firestore, 'registrations'), [firestore]);
   const { data: registrations, isLoading } = useCollection<FirestoreRegistration>(registrationsQuery);
+  const { toast } = useToast();
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  const handleConfirmPayment = async (registrationId: string) => {
+    setConfirmingId(registrationId);
+    try {
+      const regRef = doc(firestore, "registrations", registrationId);
+      await updateDoc(regRef, {
+        paymentStatus: "confirmed",
+      });
+      toast({
+        title: "Pagamento Confirmado",
+        description: "O status do pagamento foi atualizado para confirmado.",
+      });
+    } catch (error) {
+      console.error("Failed to confirm payment:", error);
+      toast({
+        title: "Erro",
+        description: "Nao foi possivel confirmar o pagamento.",
+        variant: "destructive",
+      });
+    }
+    setConfirmingId(null);
+  };
 
   if (isLoading) {
       return (
@@ -59,7 +100,9 @@ export default function RegistrationsPage() {
               <TableHead>Aventura</TableHead>
               <TableHead>Participantes</TableHead>
               <TableHead>Contato</TableHead>
-              <TableHead>Data da Inscrição</TableHead>
+              <TableHead>Pagamento</TableHead>
+              <TableHead>Data da Inscricao</TableHead>
+              <TableHead>Acoes</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -102,14 +145,62 @@ export default function RegistrationsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
+                    {reg.paymentStatus ? (
+                      <div className="space-y-1">
+                        {(() => {
+                          const config = paymentStatusConfig[reg.paymentStatus];
+                          const Icon = config.icon;
+                          return (
+                            <Badge variant={config.variant} className="flex items-center gap-1 w-fit">
+                              <Icon className="h-3 w-3" />
+                              {config.label}
+                            </Badge>
+                          );
+                        })()}
+                        {reg.totalAmount !== undefined && (
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <DollarSign className="h-3 w-3" />
+                            {formatCurrency(reg.totalAmount)}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     {format(reg.registrationDate.toDate(), "PPP p", { locale: ptBR })}
+                  </TableCell>
+                  <TableCell>
+                    {reg.paymentStatus === "awaiting_confirmation" && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleConfirmPayment(reg.id)}
+                        disabled={confirmingId === reg.id}
+                      >
+                        {confirmingId === reg.id ? (
+                          <LoaderCircle className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <CheckCircle2 className="h-4 w-4 mr-1" />
+                            Confirmar
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    {reg.paymentStatus === "confirmed" && (
+                      <span className="text-green-600 text-sm flex items-center gap-1">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Pago
+                      </span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={4} className="text-center">
-                  Nenhuma inscrição encontrada.
+                <TableCell colSpan={6} className="text-center">
+                  Nenhuma inscricao encontrada.
                 </TableCell>
               </TableRow>
             )}

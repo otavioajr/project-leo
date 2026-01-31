@@ -19,6 +19,7 @@ import { Separator } from "@/components/ui/separator";
 import type { CustomField } from "@/lib/types";
 import { useFirebase } from "@/firebase";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { useRouter } from "next/navigation";
 
 const participantSchema = z.object({
   name: z.string().min(2, "O nome do participante é obrigatório."),
@@ -38,13 +39,16 @@ type RegistrationFormValues = z.infer<typeof registrationSchema>;
 type RegistrationFormProps = {
   adventureId: string;
   adventureTitle: string;
+  adventureSlug: string;
+  adventurePrice: number;
   customFields?: CustomField[];
 };
 
-export function RegistrationForm({ adventureId, adventureTitle, customFields }: RegistrationFormProps) {
+export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, adventurePrice, customFields }: RegistrationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { firestore } = useFirebase();
+  const router = useRouter();
 
   const form = useForm<RegistrationFormValues>({
     resolver: zodResolver(registrationSchema),
@@ -69,9 +73,9 @@ export function RegistrationForm({ adventureId, adventureTitle, customFields }: 
     const currentParticipantCount = fields.length;
 
     if (desiredParticipantCount > currentParticipantCount) {
-      const newFields = [];
+      const newFields: { name: string; [key: string]: string }[] = [];
       for (let i = 0; i < desiredParticipantCount - currentParticipantCount; i++) {
-        const newParticipant: Record<string, string> = { name: "" };
+        const newParticipant: { name: string; [key: string]: string } = { name: "" };
         customFields?.forEach(field => {
             newParticipant[field.name] = "";
         });
@@ -112,29 +116,28 @@ export function RegistrationForm({ adventureId, adventureTitle, customFields }: 
     }
 
     try {
-      await addDoc(collection(firestore, "registrations"), {
+      const totalAmount = adventurePrice * values.groupSize;
+      
+      const docRef = await addDoc(collection(firestore, "registrations"), {
         ...values,
         adventureId,
         adventureTitle,
         registrationDate: serverTimestamp(),
+        paymentStatus: "pending",
+        totalAmount,
       });
 
-      toast({
-        title: "Inscrição Realizada com Sucesso!",
-        description: "Recebemos sua inscrição. Nos vemos na trilha!",
-      });
-      form.reset();
-      remove();
+      // Redirecionar para página de pagamento
+      router.push(`/adventures/${adventureSlug}/pagamento?registrationId=${docRef.id}`);
     } catch (error) {
       console.error("Registration failed:", error);
       toast({
-        title: "Falha na Inscrição",
+        title: "Falha na Inscricao",
         description: "Algo deu errado. Por favor, tente novamente.",
         variant: "destructive",
       });
+      setIsSubmitting(false);
     }
-
-    setIsSubmitting(false);
   }
 
   return (
