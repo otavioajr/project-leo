@@ -24,13 +24,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { ImageUpload } from "@/components/image-upload";
 
 
 const homePageContentSchema = z.object({
-    heroTitle: z.string().min(1, "O título do herói é obrigatório."),
-    heroDescription: z.string().min(1, "A descrição do herói é obrigatória."),
-    heroImageUrl: z.string().url("A URL da imagem do herói é inválida."),
-    heroImageDescription: z.string().min(1, "A descrição da imagem do herói é obrigatória."),
+    heroTitle: z.string().min(1, "O titulo do heroi e obrigatorio."),
+    heroDescription: z.string().min(1, "A descricao do heroi e obrigatoria."),
+    heroImageUrl: z.string().min(1, "A imagem do heroi e obrigatoria.").url("A URL da imagem do heroi e invalida."),
+    heroImageDescription: z.string().min(1, "A descricao da imagem do heroi e obrigatoria."),
     adventuresTitle: z.string().min(1, "O título das aventuras é obrigatório."),
     adventuresDescription: z.string().min(1, "A descrição das aventuras é obrigatória."),
     // Redes Sociais
@@ -135,11 +136,18 @@ export function HomePageForm({ content }: HomePageFormProps) {
             name="heroImageUrl"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>URL da Imagem Principal</FormLabel>
+                <FormLabel>Imagem Principal</FormLabel>
                 <FormControl>
-                  <Input placeholder="https://exemplo.com/imagem.jpg" {...field} />
+                  <ImageUpload
+                    value={field.value}
+                    onChange={field.onChange}
+                    folder="homepage"
+                    disabled={isSubmitting}
+                  />
                 </FormControl>
-                <FormDescription>Link para a imagem grande no topo da página.</FormDescription>
+                <FormDescription>
+                  Imagem grande no topo da pagina. Faca upload ou cole uma URL. Tamanho maximo: 5MB.
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}

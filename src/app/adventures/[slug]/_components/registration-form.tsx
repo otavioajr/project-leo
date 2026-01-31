@@ -18,7 +18,7 @@ import { useState, useEffect } from "react";
 import { Separator } from "@/components/ui/separator";
 import type { CustomField } from "@/lib/types";
 import { useFirebase } from "@/firebase";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, getDoc, doc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
 const participantSchema = z.object({
@@ -30,6 +30,7 @@ const registrationSchema = z.object({
   email: z.string().email("Por favor, insira um endereço de e-mail válido."),
   phone: z.string().min(10, "Por favor, insira um número de telefone válido."),
   groupSize: z.coerce.number().min(1, "O grupo deve ter pelo menos 1 pessoa."),
+  customData: z.record(z.string()).optional(),
   participants: z.array(participantSchema),
 });
 
@@ -50,6 +51,11 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
   const { firestore } = useFirebase();
   const router = useRouter();
 
+  const initialCustomData: Record<string, string> = {};
+  customFields?.forEach(field => {
+    initialCustomData[field.name] = "";
+  });
+
   const form = useForm<RegistrationFormValues>({
     resolver: zodResolver(registrationSchema),
     defaultValues: {
@@ -57,6 +63,7 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
       email: "",
       phone: "",
       groupSize: 1,
+      customData: initialCustomData,
       participants: [],
     },
   });
@@ -93,6 +100,19 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
     
     // Manual validation for required custom fields
     let isValid = true;
+    
+    // Validar campos customizados do contato principal
+    customFields?.forEach(cf => {
+      if (cf.required && !values.customData?.[cf.name]) {
+        form.setError(`customData.${cf.name}`, {
+          type: 'manual',
+          message: `${cf.label} é obrigatório.`
+        });
+        isValid = false;
+      }
+    });
+    
+    // Validar campos customizados dos participantes adicionais
     values.participants.forEach((participant, pIndex) => {
         customFields?.forEach(cf => {
             if (cf.required && !participant[cf.name]) {
@@ -108,7 +128,7 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
     if (!isValid) {
         toast({
             title: "Campos Obrigatórios",
-            description: "Por favor, preencha todos os campos obrigatórios para cada participante.",
+            description: "Por favor, preencha todos os campos obrigatórios.",
             variant: "destructive",
         });
         setIsSubmitting(false);
@@ -125,14 +145,17 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
         registrationDate: serverTimestamp(),
         paymentStatus: "pending",
         totalAmount,
+        registrationToken: crypto.randomUUID(),
       });
 
       // Redirecionar para página de pagamento
-      router.push(`/adventures/${adventureSlug}/pagamento?registrationId=${docRef.id}`);
+      const registrationDoc = await getDoc(docRef);
+      const token = registrationDoc.data()?.registrationToken;
+      router.push(`/adventures/${adventureSlug}/pagamento?registrationId=${docRef.id}&token=${token}`);
     } catch (error) {
       console.error("Registration failed:", error);
       toast({
-        title: "Falha na Inscricao",
+        title: "Falha na Inscrição",
         description: "Algo deu errado. Por favor, tente novamente.",
         variant: "destructive",
       });
@@ -199,6 +222,26 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
             </FormItem>
           )}
         />
+        {customFields?.map((customField) => (
+          <FormField
+            key={customField.name}
+            control={form.control}
+            name={`customData.${customField.name}`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{customField.label}{customField.required && <span className="text-destructive">*</span>}</FormLabel>
+                <FormControl>
+                  <Input 
+                    placeholder={customField.label}
+                    type={customField.type} 
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        ))}
 
         {fields.length > 0 && <Separator />}
 

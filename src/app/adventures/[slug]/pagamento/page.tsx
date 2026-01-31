@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useParams } from "next/navigation";
 import { useFirestore, useDoc, useMemoFirebase } from "@/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, runTransaction } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LoaderCircle, Copy, CheckCircle2, Clock } from "lucide-react";
+import { LoaderCircle, Copy, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 import type { Registration, PixConfig } from "@/lib/types";
 import QRCode from "qrcode";
 import Image from "next/image";
@@ -17,6 +17,7 @@ export default function PagamentoPage() {
   const searchParams = useSearchParams();
   const params = useParams();
   const registrationId = searchParams.get("registrationId");
+  const token = searchParams.get("token");
   const slug = params.slug as string;
 
   const firestore = useFirestore();
@@ -26,6 +27,7 @@ export default function PagamentoPage() {
   const [copied, setCopied] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const isConfirmingRef = useRef(false);
 
   // Fetch registration data
   const registrationRef = useMemoFirebase(
@@ -82,15 +84,38 @@ export default function PagamentoPage() {
   };
 
   const handleConfirmPayment = async () => {
-    if (!registrationId) return;
-
-    setIsConfirming(true);
-    try {
-      const regRef = doc(firestore, "registrations", registrationId);
-      await updateDoc(regRef, {
-        paymentStatus: "awaiting_confirmation",
+    if (!registrationId || isConfirmingRef.current) return;
+    
+    // Validar token antes de permitir a ação
+    if (!token || token !== registration?.registrationToken) {
+      toast({
+        title: "Acesso Negado",
+        description: "Voce nao tem permissao para confirmar este pagamento.",
+        variant: "destructive",
       });
+      return;
+    }
 
+    isConfirmingRef.current = true;
+    setIsConfirming(true);
+    
+    try {
+      await runTransaction(firestore, async (transaction) => {
+        const regRef = doc(firestore, "registrations", registrationId);
+        const regSnap = await transaction.get(regRef);
+        
+        if (!regSnap.exists()) throw new Error("Registro não encontrado");
+        
+        const regData = regSnap.data();
+        if (["confirmed", "cancelled", "refunded"].includes(regData.paymentStatus)) {
+          throw new Error("Status já está em estado terminal");
+        }
+        
+        transaction.update(regRef, {
+          paymentStatus: "awaiting_confirmation",
+        });
+      });
+      
       setPaymentConfirmed(true);
       toast({
         title: "Pagamento Informado!",
@@ -100,11 +125,13 @@ export default function PagamentoPage() {
       console.error("Failed to confirm payment:", error);
       toast({
         title: "Erro",
-        description: "Nao foi possivel confirmar o pagamento. Tente novamente.",
+        description: error instanceof Error ? error.message : "Nao foi possivel confirmar o pagamento. Tente novamente.",
         variant: "destructive",
       });
+    } finally {
+      setIsConfirming(false);
+      isConfirmingRef.current = false;
     }
-    setIsConfirming(false);
   };
 
   const isLoading = isLoadingRegistration || isLoadingPixConfig;
@@ -129,6 +156,30 @@ export default function PagamentoPage() {
           </CardHeader>
           <CardFooter>
             <Button asChild>
+              <Link href={`/adventures/${slug}`}>Voltar para Aventura</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  // Validar token
+  if (!token || token !== registration.registrationToken) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="mx-auto max-w-md">
+          <CardHeader>
+            <CardTitle className="text-destructive">Acesso Negado</CardTitle>
+            <CardDescription>
+              Voce nao tem permissao para acessar esta pagina de pagamento. O link pode ter expirado ou ser invalido.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <AlertTriangle className="mx-auto mb-4 h-16 w-16 text-amber-500" />
+          </CardContent>
+          <CardFooter>
+            <Button asChild className="w-full">
               <Link href={`/adventures/${slug}`}>Voltar para Aventura</Link>
             </Button>
           </CardFooter>
@@ -271,7 +322,7 @@ export default function PagamentoPage() {
             className="w-full"
             size="lg"
             onClick={handleConfirmPayment}
-            disabled={isConfirming}
+            disabled={isConfirming || (!token || token !== registration?.registrationToken)}
           >
             {isConfirming ? (
               <>

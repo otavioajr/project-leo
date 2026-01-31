@@ -33,6 +33,7 @@ export type Registration = {
     participants?: Record<string, string>[];
     paymentStatus?: PaymentStatus;
     totalAmount?: number;
+    registrationToken?: string;
 };
 
 export type HomePageContent = {

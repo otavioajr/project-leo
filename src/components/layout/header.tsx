@@ -15,6 +15,7 @@ import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, where, orderBy } from "firebase/firestore";
 import type { ContentPage } from "@/lib/types";
 import { Skeleton } from "../ui/skeleton";
+import { BrandLogo } from "./brand-logo";
 
 
 const staticLinks = [
@@ -77,7 +78,7 @@ export function Header() {
         <div className="flex-1">
             <Link href="/" className="flex items-center gap-2">
             <Mountain className="h-6 w-6 text-primary" />
-            <span className="flex flex-col items-center justify-center"><span className="font-brand text-primary" style={{ fontSize: '30px', height: '30px' }}>chaves</span><span className="font-adventure text-primary"> adventure</span></span>
+            <BrandLogo />
             </Link>
         </div>
 
@@ -112,7 +113,7 @@ export function Header() {
                 <div className="flex flex-col gap-4 py-8">
                     <Link href="/" className="mb-4 flex items-center gap-2 px-4">
                     <Mountain className="h-6 w-6 text-primary" />
-                    <span className="flex flex-col items-center justify-center"><span className="font-brand text-primary" style={{ fontSize: '30px', height: '30px' }}>chaves</span><span className="font-adventure text-primary"> adventure</span></span>
+                    <BrandLogo />
                     </Link>
                     <nav className="flex flex-col gap-2">
                     {navLinks.map((link) => (

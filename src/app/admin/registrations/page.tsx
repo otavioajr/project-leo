@@ -16,13 +16,31 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { User, Mail, Phone, Users, LoaderCircle, CheckCircle2, Clock, AlertCircle, DollarSign } from "lucide-react";
+import { User, Mail, Phone, Users, LoaderCircle, CheckCircle2, Clock, AlertCircle, DollarSign, MoreHorizontal, Trash2 } from "lucide-react";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, Timestamp, doc, updateDoc } from "firebase/firestore";
+import { collection, Timestamp, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import type { Registration, PaymentStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
@@ -44,6 +62,12 @@ const paymentStatusConfig: Record<PaymentStatus, { label: string; variant: "defa
   confirmed: { label: "Confirmado", variant: "default", icon: CheckCircle2 },
 };
 
+const defaultStatusConfig = {
+  label: "Desconhecido",
+  variant: "outline" as const,
+  icon: AlertCircle,
+};
+
 type FirestoreRegistration = Omit<Registration, 'registrationDate'> & {
   registrationDate: Timestamp;
 };
@@ -54,6 +78,8 @@ export default function RegistrationsPage() {
   const { data: registrations, isLoading } = useCollection<FirestoreRegistration>(registrationsQuery);
   const { toast } = useToast();
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [registrationToDelete, setRegistrationToDelete] = useState<string | null>(null);
 
   const handleConfirmPayment = async (registrationId: string) => {
     setConfirmingId(registrationId);
@@ -75,6 +101,33 @@ export default function RegistrationsPage() {
       });
     }
     setConfirmingId(null);
+  };
+
+  const handleDeleteRegistration = async () => {
+    if (!registrationToDelete) return;
+    
+    try {
+      const regRef = doc(firestore, "registrations", registrationToDelete);
+      await deleteDoc(regRef);
+      toast({
+        title: "Inscricao Excluida",
+        description: "A inscricao foi removida com sucesso.",
+      });
+    } catch (error) {
+      console.error("Failed to delete registration:", error);
+      toast({
+        title: "Erro",
+        description: "Nao foi possivel excluir a inscricao.",
+        variant: "destructive",
+      });
+    }
+    setDeleteDialogOpen(false);
+    setRegistrationToDelete(null);
+  };
+
+  const openDeleteDialog = (registrationId: string) => {
+    setRegistrationToDelete(registrationId);
+    setDeleteDialogOpen(true);
   };
 
   if (isLoading) {
@@ -148,7 +201,7 @@ export default function RegistrationsPage() {
                     {reg.paymentStatus ? (
                       <div className="space-y-1">
                         {(() => {
-                          const config = paymentStatusConfig[reg.paymentStatus];
+                          const config = paymentStatusConfig[reg.paymentStatus] || defaultStatusConfig;
                           const Icon = config.icon;
                           return (
                             <Badge variant={config.variant} className="flex items-center gap-1 w-fit">
@@ -172,28 +225,34 @@ export default function RegistrationsPage() {
                     {format(reg.registrationDate.toDate(), "PPP p", { locale: ptBR })}
                   </TableCell>
                   <TableCell>
-                    {reg.paymentStatus === "awaiting_confirmation" && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleConfirmPayment(reg.id)}
-                        disabled={confirmingId === reg.id}
-                      >
-                        {confirmingId === reg.id ? (
-                          <LoaderCircle className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            <CheckCircle2 className="h-4 w-4 mr-1" />
-                            Confirmar
-                          </>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Abrir menu</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Acoes</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {reg.paymentStatus !== "confirmed" && (
+                          <DropdownMenuItem
+                            onClick={() => handleConfirmPayment(reg.id)}
+                            disabled={confirmingId === reg.id}
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Confirmar Pagamento
+                          </DropdownMenuItem>
                         )}
-                      </Button>
-                    )}
-                    {reg.paymentStatus === "confirmed" && (
-                      <span className="text-green-600 text-sm flex items-center gap-1">
-                        <CheckCircle2 className="h-4 w-4" />
-                        Pago
-                      </span>
-                    )}
+                        <DropdownMenuItem
+                          onClick={() => openDeleteDialog(reg.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Excluir Inscricao
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
@@ -207,6 +266,26 @@ export default function RegistrationsPage() {
           </TableBody>
         </Table>
       </CardContent>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Inscricao</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta inscricao? Esta acao nao pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteRegistration}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

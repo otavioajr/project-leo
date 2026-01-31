@@ -32,6 +32,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Trash, PlusCircle } from "lucide-react";
+import { ImageUpload } from "@/components/image-upload";
 
 import {
   AlertDialog,
@@ -53,15 +54,15 @@ const customFieldSchema = z.object({
 });
 
 const adventureSchema = z.object({
-  title: z.string().min(3, "O título deve ter pelo menos 3 caracteres."),
-  description: z.string().min(10, "A descrição curta deve ter pelo menos 10 caracteres.").max(150, "A descrição curta deve ter menos de 150 caracteres."),
-  longDescription: z.string().min(20, "A descrição longa deve ter pelo menos 20 caracteres."),
-  price: z.coerce.number().min(0, "O preço deve ser um número positivo."),
-  duration: z.string().min(1, "A duração é obrigatória."),
-  location: z.string().min(1, "A localização é obrigatória."),
+  title: z.string().min(3, "O titulo deve ter pelo menos 3 caracteres."),
+  description: z.string().min(10, "A descricao curta deve ter pelo menos 10 caracteres.").max(150, "A descricao curta deve ter menos de 150 caracteres."),
+  longDescription: z.string().min(20, "A descricao longa deve ter pelo menos 20 caracteres."),
+  price: z.coerce.number().min(0, "O preco deve ser um numero positivo."),
+  duration: z.string().min(1, "A duracao e obrigatoria."),
+  location: z.string().min(1, "A localizacao e obrigatoria."),
   difficulty: z.enum(["Fácil", "Moderado", "Desafiador"]),
-  imageUrl: z.string().url("URL da imagem inválida."),
-  imageDescription: z.string().min(1, "A descrição da imagem é obrigatória."),
+  imageUrl: z.string().min(1, "A imagem e obrigatoria.").url("URL da imagem invalida."),
+  imageDescription: z.string().min(1, "A descricao da imagem e obrigatoria."),
   registrationsEnabled: z.boolean(),
   customFields: z.array(customFieldSchema).optional(),
 });
@@ -217,11 +218,18 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
               name="imageUrl"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>URL da Imagem</FormLabel>
+                  <FormLabel>Imagem Principal</FormLabel>
                   <FormControl>
-                    <Input placeholder="https://exemplo.com/imagem.jpg" {...field} />
+                    <ImageUpload
+                      value={field.value}
+                      onChange={field.onChange}
+                      folder="adventures"
+                      disabled={isSubmitting}
+                    />
                   </FormControl>
-                  <FormDescription>Link para a imagem principal da aventura.</FormDescription>
+                  <FormDescription>
+                    Faca upload de uma imagem ou cole uma URL externa. Tamanho maximo: 5MB.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -329,7 +337,24 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
         
         <div>
             <h3 className="text-xl font-headline font-semibold mb-4">Construtor de Formulário de Inscrição</h3>
-            <FormDescription className="mb-4">Adicione campos personalizados para coletar informações dos participantes. Estes campos aparecerão para cada participante adicional no grupo.</FormDescription>
+            <FormDescription className="mb-4">Configure os campos adicionais para coletar informações dos participantes.</FormDescription>
+            
+            {/* Campos fixos do sistema */}
+            <div className="mb-6 p-4 border rounded-lg bg-muted/30">
+              <h4 className="text-sm font-medium mb-3">Campos do Sistema (incluídos automaticamente)</h4>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <p className="font-medium">Contato Principal:</p>
+                  <p className="text-muted-foreground ml-2">Nome Completo, E-mail, Telefone (obrigatórios) + campos personalizados</p>
+                </div>
+                <div>
+                  <p className="font-medium">Participantes Adicionais:</p>
+                  <p className="text-muted-foreground ml-2">Nome Completo (obrigatório) + campos personalizados</p>
+                </div>
+              </div>
+            </div>
+
+            <h4 className="text-sm font-medium text-muted-foreground mb-3">Campos Personalizados (aparecem para todos os participantes)</h4>
             <div className="space-y-6">
                 {fields.map((field, index) => (
                     <div key={field.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-md relative">
@@ -414,7 +439,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                     onClick={() => append({ name: "", label: "", type: "text", required: false })}
                 >
                     <PlusCircle className="mr-2 h-4 w-4" />
-                    Adicionar Campo
+                    Adicionar Campo Personalizado
                 </Button>
             </div>
         </div>
