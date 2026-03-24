@@ -39,8 +39,8 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { User, Mail, Phone, Users, LoaderCircle, CheckCircle2, Clock, AlertCircle, DollarSign, MoreHorizontal, Trash2 } from "lucide-react";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, Timestamp, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { useCollection } from "@/supabase/use-collection";
+import { useSupabase } from "@/supabase/hooks";
 import type { Registration, PaymentStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
@@ -68,14 +68,9 @@ const defaultStatusConfig = {
   icon: AlertCircle,
 };
 
-type FirestoreRegistration = Omit<Registration, 'registrationDate'> & {
-  registrationDate: Timestamp;
-};
-
 export default function RegistrationsPage() {
-  const firestore = useFirestore();
-  const registrationsQuery = useMemoFirebase(() => collection(firestore, 'registrations'), [firestore]);
-  const { data: registrations, isLoading } = useCollection<FirestoreRegistration>(registrationsQuery);
+  const { data: registrations, isLoading } = useCollection<Registration>('registrations');
+  const supabase = useSupabase();
   const { toast } = useToast();
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -84,10 +79,8 @@ export default function RegistrationsPage() {
   const handleConfirmPayment = async (registrationId: string) => {
     setConfirmingId(registrationId);
     try {
-      const regRef = doc(firestore, "registrations", registrationId);
-      await updateDoc(regRef, {
-        paymentStatus: "confirmed",
-      });
+      const { error } = await supabase.from('registrations').update({ payment_status: 'confirmed' }).eq('id', registrationId);
+      if (error) throw error;
       toast({
         title: "Pagamento Confirmado",
         description: "O status do pagamento foi atualizado para confirmado.",
@@ -105,10 +98,10 @@ export default function RegistrationsPage() {
 
   const handleDeleteRegistration = async () => {
     if (!registrationToDelete) return;
-    
+
     try {
-      const regRef = doc(firestore, "registrations", registrationToDelete);
-      await deleteDoc(regRef);
+      const { error } = await supabase.from('registrations').delete().eq('id', registrationToDelete);
+      if (error) throw error;
       toast({
         title: "Inscricao Excluida",
         description: "A inscricao foi removida com sucesso.",
@@ -141,9 +134,9 @@ export default function RegistrationsPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Todas as Inscrições</CardTitle>
+        <CardTitle>Todas as Inscricoes</CardTitle>
         <CardDescription>
-          Veja todas as inscrições de usuários para suas aventuras.
+          Veja todas as inscricoes de usuarios para suas aventuras.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -162,11 +155,11 @@ export default function RegistrationsPage() {
             {registrations && registrations.length > 0 ? (
               registrations.map((reg) => (
                 <TableRow key={reg.id}>
-                  <TableCell className="font-medium">{reg.adventureTitle}</TableCell>
+                  <TableCell className="font-medium">{reg.adventure_title}</TableCell>
                   <TableCell>
                     <div className="font-medium flex items-center gap-2">
                         <Users className="h-4 w-4 text-muted-foreground" />
-                        Grupo de {reg.groupSize}
+                        Grupo de {reg.group_size}
                     </div>
                     <ul className="pl-6 mt-1 space-y-2 text-sm text-muted-foreground">
                         <li className="flex items-center gap-2 font-semibold text-foreground"><User className="h-4 w-4" />{reg.name} <span className="text-xs text-muted-foreground">(Contato)</span></li>
@@ -198,10 +191,10 @@ export default function RegistrationsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {reg.paymentStatus ? (
+                    {reg.payment_status ? (
                       <div className="space-y-1">
                         {(() => {
-                          const config = paymentStatusConfig[reg.paymentStatus] || defaultStatusConfig;
+                          const config = paymentStatusConfig[reg.payment_status] || defaultStatusConfig;
                           const Icon = config.icon;
                           return (
                             <Badge variant={config.variant} className="flex items-center gap-1 w-fit">
@@ -210,10 +203,10 @@ export default function RegistrationsPage() {
                             </Badge>
                           );
                         })()}
-                        {reg.totalAmount !== undefined && (
+                        {reg.total_amount !== undefined && (
                           <div className="flex items-center gap-1 text-sm text-muted-foreground">
                             <DollarSign className="h-3 w-3" />
-                            {formatCurrency(reg.totalAmount)}
+                            {formatCurrency(reg.total_amount)}
                           </div>
                         )}
                       </div>
@@ -222,7 +215,7 @@ export default function RegistrationsPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {format(reg.registrationDate.toDate(), "PPP p", { locale: ptBR })}
+                    {format(new Date(reg.registration_date), "PPP p", { locale: ptBR })}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -235,7 +228,7 @@ export default function RegistrationsPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Acoes</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {reg.paymentStatus !== "confirmed" && (
+                        {reg.payment_status !== "confirmed" && (
                           <DropdownMenuItem
                             onClick={() => handleConfirmPayment(reg.id)}
                             disabled={confirmingId === reg.id}
