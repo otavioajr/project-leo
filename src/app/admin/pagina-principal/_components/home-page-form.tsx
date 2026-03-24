@@ -7,8 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { HomePageContent } from "@/lib/types";
-import { useFirebase } from "@/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { useSupabase } from "@/supabase/hooks";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,8 +31,8 @@ const homePageContentSchema = z.object({
     heroDescription: z.string().min(1, "A descricao do heroi e obrigatoria."),
     heroImageUrl: z.string().min(1, "A imagem do heroi e obrigatoria.").url("A URL da imagem do heroi e invalida."),
     heroImageDescription: z.string().min(1, "A descricao da imagem do heroi e obrigatoria."),
-    adventuresTitle: z.string().min(1, "O título das aventuras é obrigatório."),
-    adventuresDescription: z.string().min(1, "A descrição das aventuras é obrigatória."),
+    adventuresTitle: z.string().min(1, "O titulo das aventuras e obrigatorio."),
+    adventuresDescription: z.string().min(1, "A descricao das aventuras e obrigatoria."),
     // Redes Sociais
     facebookUrl: z.string().optional(),
     facebookEnabled: z.boolean().optional(),
@@ -42,13 +41,13 @@ const homePageContentSchema = z.object({
     twitterUrl: z.string().optional(),
     twitterEnabled: z.boolean().optional(),
 }).refine((data) => !data.facebookEnabled || (data.facebookUrl && data.facebookUrl.length > 0), {
-    message: "URL do Facebook é obrigatório quando habilitado.",
+    message: "URL do Facebook e obrigatorio quando habilitado.",
     path: ["facebookUrl"],
 }).refine((data) => !data.instagramEnabled || (data.instagramUrl && data.instagramUrl.length > 0), {
-    message: "URL do Instagram é obrigatório quando habilitado.",
+    message: "URL do Instagram e obrigatorio quando habilitado.",
     path: ["instagramUrl"],
 }).refine((data) => !data.twitterEnabled || (data.twitterUrl && data.twitterUrl.length > 0), {
-    message: "URL do Twitter é obrigatório quando habilitado.",
+    message: "URL do Twitter e obrigatorio quando habilitado.",
     path: ["twitterUrl"],
 });
 
@@ -62,7 +61,7 @@ export function HomePageForm({ content }: HomePageFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { firestore } = useFirebase();
+  const supabase = useSupabase();
 
   const form = useForm<HomePageFormValues>({
     resolver: zodResolver(homePageContentSchema),
@@ -79,13 +78,13 @@ export function HomePageForm({ content }: HomePageFormProps) {
 
   async function onSubmit(values: HomePageFormValues) {
     setIsSubmitting(true);
-    
+
     try {
-      const contentRef = doc(firestore, 'content', 'homepage');
-      await setDoc(contentRef, values, { merge: true });
+      const { error } = await supabase.from('content').upsert({ id: 'homepage', data: values });
+      if (error) throw error;
       toast({
-        title: "Página Principal Atualizada",
-        description: `O conteúdo foi salvo com sucesso.`,
+        title: "Pagina Principal Atualizada",
+        description: `O conteudo foi salvo com sucesso.`,
       });
       router.refresh();
     } catch (error) {
@@ -103,16 +102,16 @@ export function HomePageForm({ content }: HomePageFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <h3 className="text-xl font-headline font-semibold">Seção Principal (Hero)</h3>
+        <h3 className="text-xl font-headline font-semibold">Secao Principal (Hero)</h3>
         <div className="space-y-4">
           <FormField
             control={form.control}
             name="heroTitle"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Título Principal</FormLabel>
+                <FormLabel>Titulo Principal</FormLabel>
                 <FormControl>
-                  <Input placeholder="Título que aparece sobre a imagem principal" {...field} />
+                  <Input placeholder="Titulo que aparece sobre a imagem principal" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -123,9 +122,9 @@ export function HomePageForm({ content }: HomePageFormProps) {
             name="heroDescription"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Texto do Herói</FormLabel>
+                <FormLabel>Texto do Heroi</FormLabel>
                 <FormControl>
-                  <Textarea placeholder="Texto de apoio que aparece abaixo do título" {...field} />
+                  <Textarea placeholder="Texto de apoio que aparece abaixo do titulo" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -157,9 +156,9 @@ export function HomePageForm({ content }: HomePageFormProps) {
             name="heroImageDescription"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Descrição da Imagem Principal (Texto Alternativo)</FormLabel>
+                <FormLabel>Descricao da Imagem Principal (Texto Alternativo)</FormLabel>
                 <FormControl>
-                  <Textarea placeholder="Descrição concisa da imagem para acessibilidade." {...field} />
+                  <Textarea placeholder="Descricao concisa da imagem para acessibilidade." {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -168,17 +167,17 @@ export function HomePageForm({ content }: HomePageFormProps) {
         </div>
 
         <Separator />
-        
-        <h3 className="text-xl font-headline font-semibold">Seção de Aventuras</h3>
+
+        <h3 className="text-xl font-headline font-semibold">Secao de Aventuras</h3>
         <div className="space-y-4">
              <FormField
                 control={form.control}
                 name="adventuresTitle"
                 render={({ field }) => (
                 <FormItem>
-                    <FormLabel>Título da Seção de Aventuras</FormLabel>
+                    <FormLabel>Titulo da Secao de Aventuras</FormLabel>
                     <FormControl>
-                    <Input placeholder="Título que aparece acima dos cartões de aventura" {...field} />
+                    <Input placeholder="Titulo que aparece acima dos cartoes de aventura" {...field} />
                     </FormControl>
                     <FormMessage />
                 </FormItem>
@@ -189,9 +188,9 @@ export function HomePageForm({ content }: HomePageFormProps) {
                 name="adventuresDescription"
                 render={({ field }) => (
                 <FormItem>
-                    <FormLabel>Texto da Seção de Aventuras</FormLabel>
+                    <FormLabel>Texto da Secao de Aventuras</FormLabel>
                     <FormControl>
-                    <Textarea placeholder="Texto de apoio para a seção de aventuras" {...field} />
+                    <Textarea placeholder="Texto de apoio para a secao de aventuras" {...field} />
                     </FormControl>
                     <FormMessage />
                 </FormItem>
@@ -202,7 +201,7 @@ export function HomePageForm({ content }: HomePageFormProps) {
         <Separator />
 
         <h3 className="text-xl font-headline font-semibold">Redes Sociais</h3>
-        <p className="text-sm text-muted-foreground">Configure os links das redes sociais que aparecem no rodapé do site.</p>
+        <p className="text-sm text-muted-foreground">Configure os links das redes sociais que aparecem no rodape do site.</p>
 
         <div className="space-y-6">
           {/* Facebook */}
@@ -295,7 +294,7 @@ export function HomePageForm({ content }: HomePageFormProps) {
 
         <div className="flex justify-end mt-8">
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Salvando..." : "Salvar Alterações"}
+            {isSubmitting ? "Salvando..." : "Salvar Alteracoes"}
           </Button>
         </div>
       </form>

@@ -1,8 +1,7 @@
 "use client";
 
 import { notFound, useParams } from "next/navigation";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { useCollection } from "@/supabase/use-collection";
 import type { ContentPage } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -23,24 +22,18 @@ function PageLoading() {
 export default function DynamicPage() {
   const params = useParams();
   const slug = params.slug as string;
-  const firestore = useFirestore();
 
-  // Busca todos os documentos e filtra no cliente (evita problemas com query where)
-  const pagesQuery = useMemoFirebase(
-    () => collection(firestore, 'pages'),
-    [firestore]
-  );
-  const { data: allPages, isLoading } = useCollection<ContentPage>(pagesQuery);
-  
+  const { data: allPages, isLoading } = useCollection<ContentPage>('pages');
+
   // Filtra pelo slug no cliente
   const page = allPages?.find(p => p.slug === slug);
 
-  // Mostrar loading enquanto carrega OU enquanto allPages ainda é null
+  // Mostrar loading enquanto carrega OU enquanto allPages ainda e null
   if (isLoading || allPages === null) {
     return <PageLoading />;
   }
 
-  // Só mostrar 404 depois de confirmar que allPages é um array e não encontrou a página
+  // So mostrar 404 depois de confirmar que allPages e um array e nao encontrou a pagina
   if (Array.isArray(allPages) && !page) {
     notFound();
   }
@@ -54,4 +47,3 @@ export default function DynamicPage() {
     </div>
   );
 }
-

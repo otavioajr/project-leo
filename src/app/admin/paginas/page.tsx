@@ -18,30 +18,27 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Edit, PlusCircle, LoaderCircle, Eye, EyeOff } from "lucide-react";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { useCollection } from "@/supabase/use-collection";
 import type { ContentPage } from "@/lib/types";
 
 export default function PaginasPage() {
-  const firestore = useFirestore();
-  const pagesQuery = useMemoFirebase(() => collection(firestore, 'pages'), [firestore]);
-  const { data: pages, isLoading } = useCollection<ContentPage>(pagesQuery);
+  const { data: pages, isLoading } = useCollection<ContentPage>('pages');
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Páginas de Conteúdo</CardTitle>
+            <CardTitle>Paginas de Conteudo</CardTitle>
             <CardDescription>
-              Crie e edite as páginas do seu site.
+              Crie e edite as paginas do seu site.
             </CardDescription>
           </div>
           <Button asChild size="sm" className="gap-1">
             <Link href="/admin/paginas/new">
               <PlusCircle className="h-3.5 w-3.5" />
               <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Criar Página
+                Criar Pagina
               </span>
             </Link>
           </Button>
@@ -57,10 +54,10 @@ export default function PaginasPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Título da Página</TableHead>
-              <TableHead>Visível no Menu</TableHead>
+              <TableHead>Titulo da Pagina</TableHead>
+              <TableHead>Visivel no Menu</TableHead>
               <TableHead>
-                <span className="sr-only">Ações</span>
+                <span className="sr-only">Acoes</span>
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -71,8 +68,8 @@ export default function PaginasPage() {
                   <TableCell className="font-medium">{page.title}</TableCell>
                   <TableCell className="text-muted-foreground">
                     <div className="flex items-center gap-2">
-                        {page.showInHeader ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                        <span>{page.showInHeader ? 'Sim' : 'Não'}</span>
+                        {page.show_in_header ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                        <span>{page.show_in_header ? 'Sim' : 'Nao'}</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
@@ -88,7 +85,7 @@ export default function PaginasPage() {
             ) : (
                 <TableRow>
                     <TableCell colSpan={3} className="text-center">
-                    Nenhuma página encontrada. Comece criando uma!
+                    Nenhuma pagina encontrada. Comece criando uma!
                     </TableCell>
                 </TableRow>
             )}

@@ -17,14 +17,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useState, useEffect } from "react";
-import { useFirestore } from "@/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { useSupabase } from "@/supabase/hooks";
 import type { PixConfig } from "@/lib/types";
 import QRCode from "qrcode";
 import Image from "next/image";
 
 const pixConfigSchema = z.object({
-  pixCopiaECola: z.string().min(1, "O texto PIX copia e cola é obrigatório."),
+  pixCopiaECola: z.string().min(1, "O texto PIX copia e cola e obrigatorio."),
   pixEnabled: z.boolean(),
   instructions: z.string().optional(),
 });
@@ -39,7 +38,7 @@ export function PixConfigForm({ config }: PixConfigFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [qrCodePreview, setQrCodePreview] = useState<string | null>(null);
   const { toast } = useToast();
-  const firestore = useFirestore();
+  const supabase = useSupabase();
 
   const form = useForm<PixConfigFormValues>({
     resolver: zodResolver(pixConfigSchema),
@@ -73,18 +72,18 @@ export function PixConfigForm({ config }: PixConfigFormProps) {
     setIsSubmitting(true);
 
     try {
-      const configRef = doc(firestore, "content", "pix");
-      await setDoc(configRef, values, { merge: true });
+      const { error } = await supabase.from('content').upsert({ id: 'pix', data: values });
+      if (error) throw error;
 
       toast({
-        title: "Configuração Salva",
-        description: "As configurações do PIX foram atualizadas com sucesso.",
+        title: "Configuracao Salva",
+        description: "As configuracoes do PIX foram atualizadas com sucesso.",
       });
     } catch (error) {
       console.error("Failed to save PIX config:", error);
       toast({
         title: "Erro ao Salvar",
-        description: "Não foi possível salvar as configurações. Tente novamente.",
+        description: "Nao foi possivel salvar as configuracoes. Tente novamente.",
         variant: "destructive",
       });
     }
@@ -103,7 +102,7 @@ export function PixConfigForm({ config }: PixConfigFormProps) {
               <div className="space-y-0.5">
                 <FormLabel className="text-base">Ativar Pagamento PIX</FormLabel>
                 <FormDescription>
-                  Quando ativado, os clientes serão direcionados para a página de pagamento após a inscrição.
+                  Quando ativado, os clientes serao direcionados para a pagina de pagamento apos a inscricao.
                 </FormDescription>
               </div>
               <FormControl>
@@ -124,13 +123,13 @@ export function PixConfigForm({ config }: PixConfigFormProps) {
               <FormLabel>PIX Copia e Cola</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Cole aqui o código PIX copia e cola..."
+                  placeholder="Cole aqui o codigo PIX copia e cola..."
                   className="min-h-[120px] font-mono text-sm"
                   {...field}
                 />
               </FormControl>
               <FormDescription>
-                Cole o texto do PIX copia e cola que você gerou no seu banco. Este texto será convertido em um QR Code para seus clientes.
+                Cole o texto do PIX copia e cola que voce gerou no seu banco. Este texto sera convertido em um QR Code para seus clientes.
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -157,16 +156,16 @@ export function PixConfigForm({ config }: PixConfigFormProps) {
           name="instructions"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Instruções Adicionais (Opcional)</FormLabel>
+              <FormLabel>Instrucoes Adicionais (Opcional)</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Ex: Após realizar o pagamento, aguarde a confirmação por e-mail..."
+                  placeholder="Ex: Apos realizar o pagamento, aguarde a confirmacao por e-mail..."
                   className="min-h-[80px]"
                   {...field}
                 />
               </FormControl>
               <FormDescription>
-                Texto adicional que será exibido na página de pagamento para orientar o cliente.
+                Texto adicional que sera exibido na pagina de pagamento para orientar o cliente.
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -174,7 +173,7 @@ export function PixConfigForm({ config }: PixConfigFormProps) {
         />
 
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Salvando..." : "Salvar Configurações"}
+          {isSubmitting ? "Salvando..." : "Salvar Configuracoes"}
         </Button>
       </form>
     </Form>

@@ -3,8 +3,7 @@
 import { useParams, notFound } from "next/navigation";
 import { ContentPageForm } from "../_components/content-page-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { useCollection } from "@/supabase/use-collection";
 import type { ContentPage } from "@/lib/types";
 import { LoaderCircle } from "lucide-react";
 
@@ -12,19 +11,13 @@ import { LoaderCircle } from "lucide-react";
 export default function EditContentPage() {
   const params = useParams();
   const slug = params.slug as string;
-  const firestore = useFirestore();
 
-  // Busca todos os documentos e filtra no cliente (evita problemas com índice/where)
-  const pagesQuery = useMemoFirebase(
-    () => collection(firestore, 'pages'),
-    [firestore]
-  );
-  const { data: allPages, isLoading } = useCollection<ContentPage>(pagesQuery);
-  
+  const { data: allPages, isLoading } = useCollection<ContentPage>('pages');
+
   // Filtra pelo slug no cliente
   const page = allPages?.find(p => p.slug === slug);
 
-  // Mostrar loading enquanto carrega OU enquanto allPages ainda é null
+  // Mostrar loading enquanto carrega OU enquanto allPages ainda e null
   if (isLoading || allPages === null) {
     return (
         <div className="flex items-center justify-center p-8">
@@ -33,7 +26,7 @@ export default function EditContentPage() {
     )
   }
 
-  // Só mostrar 404 depois de confirmar que allPages é um array e não encontrou a página
+  // So mostrar 404 depois de confirmar que allPages e um array e nao encontrou a pagina
   if (Array.isArray(allPages) && !page) {
     return notFound();
   }
@@ -41,9 +34,9 @@ export default function EditContentPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Editar Página: {page?.title}</CardTitle>
+        <CardTitle>Editar Pagina: {page?.title}</CardTitle>
         <CardDescription>
-          Atualize o título e o conteúdo da página.
+          Atualize o titulo e o conteudo da pagina.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -52,4 +45,3 @@ export default function EditContentPage() {
     </Card>
   );
 }
-

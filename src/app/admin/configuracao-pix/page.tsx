@@ -2,22 +2,20 @@
 
 import { PixConfigForm } from "./_components/pix-config-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useDoc } from "@/supabase/use-doc";
 import type { PixConfig } from "@/lib/types";
 import { LoaderCircle } from "lucide-react";
 
 export default function ConfiguracaoPixPage() {
-  const firestore = useFirestore();
-  const configRef = useMemoFirebase(() => doc(firestore, 'content', 'pix'), [firestore]);
-  const { data: config, isLoading } = useDoc<PixConfig>(configRef);
+  const { data: configDoc, isLoading } = useDoc<{ data: PixConfig }>('content', 'pix');
+  const config = configDoc?.data ?? null;
 
   const defaultConfig: PixConfig = {
     pixCopiaECola: '',
     pixEnabled: false,
     instructions: '',
   };
-  
+
   const currentConfig = config || defaultConfig;
 
   return (

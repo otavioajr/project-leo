@@ -7,8 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { ContentPage } from "@/lib/types";
-import { useFirebase } from "@/firebase";
-import { doc, setDoc, addDoc, deleteDoc, collection } from "firebase/firestore";
+import { useSupabase } from "@/supabase/hooks";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -37,9 +36,9 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const contentPageSchema = z.object({
-    slug: z.string().min(1, "O slug é obrigatório.").regex(/^[a-z0-9-]+$/, "Use apenas letras minúsculas, números e hífens."),
-    title: z.string().min(1, "O título é obrigatório."),
-    content: z.string().min(1, "O conteúdo não pode estar vazio."),
+    slug: z.string().min(1, "O slug e obrigatorio.").regex(/^[a-z0-9-]+$/, "Use apenas letras minusculas, numeros e hifens."),
+    title: z.string().min(1, "O titulo e obrigatorio."),
+    content: z.string().min(1, "O conteudo nao pode estar vazio."),
     showInHeader: z.boolean(),
     navOrder: z.coerce.number().optional(),
 });
@@ -68,12 +67,18 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const { firestore } = useFirebase();
+  const supabase = useSupabase();
   const isEditing = !!page;
 
   const form = useForm<ContentPageFormValues>({
     resolver: zodResolver(contentPageSchema),
-    defaultValues: page || {
+    defaultValues: page ? {
+      slug: page.slug,
+      title: page.title,
+      content: page.content,
+      showInHeader: page.show_in_header,
+      navOrder: page.nav_order ?? 0,
+    } : {
         slug: "",
         title: "",
         content: "",
@@ -81,7 +86,7 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
         navOrder: 0,
     },
   });
-  
+
   const title = form.watch('title');
   useEffect(() => {
     if (!isEditing && title) {
@@ -92,21 +97,29 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
 
   async function onSubmit(values: ContentPageFormValues) {
     setIsSubmitting(true);
-    
+
     try {
+      const pageData = {
+        slug: values.slug,
+        title: values.title,
+        content: values.content,
+        show_in_header: values.showInHeader,
+        nav_order: values.navOrder ?? 0,
+      };
+
       if (isEditing) {
-        const pageRef = doc(firestore, 'pages', page.id);
-        await setDoc(pageRef, values, { merge: true });
+        const { error } = await supabase.from('pages').update(pageData).eq('id', page.id);
+        if (error) throw error;
         toast({
-          title: "Página Atualizada",
-          description: `A página "${values.title}" foi salva com sucesso.`,
+          title: "Pagina Atualizada",
+          description: `A pagina "${values.title}" foi salva com sucesso.`,
         });
       } else {
-        const newPageRef = doc(firestore, 'pages', values.slug);
-        await setDoc(newPageRef, values);
+        const { error } = await supabase.from('pages').insert(pageData);
+        if (error) throw error;
         toast({
-          title: "Página Criada",
-          description: `A página "${values.title}" foi criada com sucesso.`,
+          title: "Pagina Criada",
+          description: `A pagina "${values.title}" foi criada com sucesso.`,
         });
         router.push('/admin/paginas');
       }
@@ -127,9 +140,10 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
     if (!page) return;
     setIsDeleting(true);
     try {
-      await deleteDoc(doc(firestore, "pages", page.id));
+      const { error } = await supabase.from('pages').delete().eq('id', page.id);
+      if (error) throw error;
       toast({
-        title: "Página Excluída",
+        title: "Pagina Excluida",
         description: `"${page.title}" foi removida.`,
       });
       router.push("/admin/paginas");
@@ -137,7 +151,7 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
     } catch (error) {
       console.error("Failed to delete page:", error);
       toast({
-        title: "Falha na Exclusão",
+        title: "Falha na Exclusao",
         description: "Algo deu errado.",
         variant: "destructive",
       });
@@ -154,9 +168,9 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
           name="title"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Título da Página</FormLabel>
+              <FormLabel>Titulo da Pagina</FormLabel>
               <FormControl>
-                <Input placeholder="Título que aparece na página" {...field} />
+                <Input placeholder="Titulo que aparece na pagina" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -171,7 +185,7 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
               <FormControl>
                 <Input placeholder="sera-gerado-automaticamente" {...field} disabled={isEditing} />
               </FormControl>
-              <FormDescription>Parte da URL da página. É gerado automaticamente a partir do título ao criar uma nova página.</FormDescription>
+              <FormDescription>Parte da URL da pagina. E gerado automaticamente a partir do titulo ao criar uma nova pagina.</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -181,9 +195,9 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
           name="content"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Conteúdo da Página</FormLabel>
+              <FormLabel>Conteudo da Pagina</FormLabel>
               <FormControl>
-                <Textarea placeholder="Conteúdo da página. Você pode usar tags HTML básicas para formatação." rows={15} {...field} />
+                <Textarea placeholder="Conteudo da pagina. Voce pode usar tags HTML basicas para formatacao." rows={15} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -195,9 +209,9 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
             render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                 <div className="space-y-0.5">
-                    <FormLabel>Mostrar no Cabeçalho</FormLabel>
+                    <FormLabel>Mostrar no Cabecalho</FormLabel>
                     <FormDescription>
-                    Se ativado, um link para esta página aparecerá no menu principal.
+                    Se ativado, um link para esta pagina aparecera no menu principal.
                     </FormDescription>
                 </div>
                 <FormControl>
@@ -214,11 +228,11 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
           name="navOrder"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Ordem de Navegação</FormLabel>
+              <FormLabel>Ordem de Navegacao</FormLabel>
               <FormControl>
                 <Input type="number" {...field} />
               </FormControl>
-              <FormDescription>Define a ordem dos links no menu (números menores aparecem primeiro).</FormDescription>
+              <FormDescription>Define a ordem dos links no menu (numeros menores aparecem primeiro).</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -230,14 +244,14 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
                         <AlertDialogTrigger asChild>
                         <Button type="button" variant="destructive" disabled={isDeleting}>
                             <Trash className="mr-2 h-4 w-4" />
-                            {isDeleting ? "Excluindo..." : "Excluir Página"}
+                            {isDeleting ? "Excluindo..." : "Excluir Pagina"}
                         </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                            <AlertDialogTitle>Voce tem certeza?</AlertDialogTitle>
                             <AlertDialogDescription>
-                            Esta ação não pode ser desfeita. Isso excluirá permanentemente a página.
+                            Esta acao nao pode ser desfeita. Isso excluira permanentemente a pagina.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -251,7 +265,7 @@ export function ContentPageForm({ page }: ContentPageFormProps) {
                 )}
             </div>
             <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Salvando..." : (isEditing ? "Salvar Alterações" : "Criar Página")}
+                {isSubmitting ? "Salvando..." : (isEditing ? "Salvar Alteracoes" : "Criar Pagina")}
             </Button>
         </div>
       </form>
