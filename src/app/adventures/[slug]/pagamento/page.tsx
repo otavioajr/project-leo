@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useParams } from "next/navigation";
-import { useFirestore, useDoc, useMemoFirebase } from "@/firebase";
-import { doc, updateDoc, runTransaction } from "firebase/firestore";
+import { useSupabase } from "@/supabase/hooks";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -20,7 +19,7 @@ export default function PagamentoPage() {
   const token = searchParams.get("token");
   const slug = params.slug as string;
 
-  const firestore = useFirestore();
+  const supabase = useSupabase();
   const { toast } = useToast();
 
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
@@ -29,16 +28,38 @@ export default function PagamentoPage() {
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const isConfirmingRef = useRef(false);
 
-  // Fetch registration data
-  const registrationRef = useMemoFirebase(
-    () => (registrationId ? doc(firestore, "registrations", registrationId) : null),
-    [firestore, registrationId]
-  );
-  const { data: registration, isLoading: isLoadingRegistration } = useDoc<Registration>(registrationRef);
+  // Fetch registration data via RPC (public/unauthenticated access)
+  const [registration, setRegistration] = useState<Registration | null>(null);
+  const [isLoadingRegistration, setIsLoadingRegistration] = useState(true);
+
+  useEffect(() => {
+    if (!registrationId || !token) {
+      setIsLoadingRegistration(false);
+      return;
+    }
+    supabase
+      .rpc('get_registration_by_token', { p_id: registrationId, p_token: token })
+      .then(({ data, error }) => {
+        if (data && data.length > 0) setRegistration(data[0] as Registration);
+        setIsLoadingRegistration(false);
+      });
+  }, [supabase, registrationId, token]);
 
   // Fetch PIX config
-  const pixConfigRef = useMemoFirebase(() => doc(firestore, "content", "pix"), [firestore]);
-  const { data: pixConfig, isLoading: isLoadingPixConfig } = useDoc<PixConfig>(pixConfigRef);
+  const [pixConfig, setPixConfig] = useState<PixConfig | null>(null);
+  const [isLoadingPixConfig, setIsLoadingPixConfig] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from('content')
+      .select('data')
+      .eq('id', 'pix')
+      .single()
+      .then(({ data, error }) => {
+        if (data) setPixConfig(data.data as PixConfig);
+        setIsLoadingPixConfig(false);
+      });
+  }, [supabase]);
 
   // Generate QR Code when PIX config is loaded
   useEffect(() => {
@@ -58,7 +79,7 @@ export default function PagamentoPage() {
 
   // Check if already confirmed
   useEffect(() => {
-    if (registration?.paymentStatus === "awaiting_confirmation" || registration?.paymentStatus === "confirmed") {
+    if (registration?.payment_status === "awaiting_confirmation" || registration?.payment_status === "confirmed") {
       setPaymentConfirmed(true);
     }
   }, [registration]);
@@ -85,9 +106,9 @@ export default function PagamentoPage() {
 
   const handleConfirmPayment = async () => {
     if (!registrationId || isConfirmingRef.current) return;
-    
+
     // Validar token antes de permitir a ação
-    if (!token || token !== registration?.registrationToken) {
+    if (!token || token !== registration?.registration_token) {
       toast({
         title: "Acesso Negado",
         description: "Voce nao tem permissao para confirmar este pagamento.",
@@ -98,24 +119,15 @@ export default function PagamentoPage() {
 
     isConfirmingRef.current = true;
     setIsConfirming(true);
-    
+
     try {
-      await runTransaction(firestore, async (transaction) => {
-        const regRef = doc(firestore, "registrations", registrationId);
-        const regSnap = await transaction.get(regRef);
-        
-        if (!regSnap.exists()) throw new Error("Registro não encontrado");
-        
-        const regData = regSnap.data();
-        if (["confirmed", "cancelled", "refunded"].includes(regData.paymentStatus)) {
-          throw new Error("Status já está em estado terminal");
-        }
-        
-        transaction.update(regRef, {
-          paymentStatus: "awaiting_confirmation",
-        });
+      const { data, error } = await supabase.rpc('confirm_payment_by_token', {
+        p_id: registrationId,
+        p_token: token,
       });
-      
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error("Não foi possível confirmar o pagamento");
+
       setPaymentConfirmed(true);
       toast({
         title: "Pagamento Informado!",
@@ -165,7 +177,7 @@ export default function PagamentoPage() {
   }
 
   // Validar token
-  if (!token || token !== registration.registrationToken) {
+  if (!token || token !== registration.registration_token) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card className="mx-auto max-w-md">
@@ -195,7 +207,7 @@ export default function PagamentoPage() {
           <CardHeader>
             <CardTitle className="text-center text-primary">Inscricao Realizada!</CardTitle>
             <CardDescription className="text-center">
-              Sua inscricao para <strong>{registration.adventureTitle}</strong> foi registrada com sucesso!
+              Sua inscricao para <strong>{registration.adventure_title}</strong> foi registrada com sucesso!
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
@@ -221,7 +233,7 @@ export default function PagamentoPage() {
           <CardHeader>
             <CardTitle className="text-center text-primary">Aguardando Confirmacao</CardTitle>
             <CardDescription className="text-center">
-              Sua inscricao para <strong>{registration.adventureTitle}</strong> esta aguardando a confirmacao do pagamento.
+              Sua inscricao para <strong>{registration.adventure_title}</strong> esta aguardando a confirmacao do pagamento.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
@@ -253,7 +265,7 @@ export default function PagamentoPage() {
         <CardHeader className="text-center">
           <CardTitle className="font-headline text-2xl text-primary">Complete sua Inscricao</CardTitle>
           <CardDescription>
-            Para confirmar sua inscricao em <strong>{registration.adventureTitle}</strong>, realize o pagamento via PIX.
+            Para confirmar sua inscricao em <strong>{registration.adventure_title}</strong>, realize o pagamento via PIX.
           </CardDescription>
         </CardHeader>
 
@@ -262,10 +274,10 @@ export default function PagamentoPage() {
           <div className="rounded-lg bg-muted p-4 text-center">
             <p className="text-sm text-muted-foreground">Valor Total</p>
             <p className="text-3xl font-bold text-primary">
-              {formatCurrency(registration.totalAmount || 0)}
+              {formatCurrency(registration.total_amount || 0)}
             </p>
             <p className="text-xs text-muted-foreground">
-              ({registration.groupSize} {registration.groupSize === 1 ? "pessoa" : "pessoas"})
+              ({registration.group_size} {registration.group_size === 1 ? "pessoa" : "pessoas"})
             </p>
           </div>
 
@@ -322,7 +334,7 @@ export default function PagamentoPage() {
             className="w-full"
             size="lg"
             onClick={handleConfirmPayment}
-            disabled={isConfirming || (!token || token !== registration?.registrationToken)}
+            disabled={isConfirming || (!token || token !== registration?.registration_token)}
           >
             {isConfirming ? (
               <>
