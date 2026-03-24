@@ -10,30 +10,32 @@ export type Adventure = {
   slug: string;
   title: string;
   description: string;
-  longDescription: string;
+  long_description: string;
   price: number;
   duration: string;
   location: string;
   difficulty: 'Fácil' | 'Moderado' | 'Desafiador';
-  imageUrl: string;
-  imageDescription: string;
-  registrationsEnabled: boolean;
-  customFields?: CustomField[];
+  image_url: string;
+  image_description: string;
+  registrations_enabled: boolean;
+  custom_fields?: CustomField[];
+  created_at: string;
 };
 
 export type Registration = {
     id: string;
-    adventureId: string;
-    adventureTitle: string;
+    adventure_id: string;
+    adventure_title: string;
     name: string;
     email: string;
     phone: string;
-    registrationDate: string;
-    groupSize: number;
+    registration_date: string;
+    group_size: number;
     participants?: Record<string, string>[];
-    paymentStatus?: PaymentStatus;
-    totalAmount?: number;
-    registrationToken?: string;
+    payment_status?: PaymentStatus;
+    total_amount?: number;
+    registration_token?: string;
+    custom_data?: Record<string, string>;
 };
 
 export type HomePageContent = {
@@ -58,8 +60,8 @@ export type ContentPage = {
   slug: string;
   title: string;
   content: string;
-  showInHeader: boolean;
-  navOrder?: number;
+  show_in_header: boolean;
+  nav_order?: number;
 };
 
 export type AdminRole = {
