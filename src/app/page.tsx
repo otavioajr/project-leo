@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AdventureCard } from '@/components/adventure-card';
 import { ArrowRight, LoaderCircle } from 'lucide-react';
-import { useCollection, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { useCollection } from '@/supabase/use-collection';
+import { useDoc } from '@/supabase/use-doc';
 import type { Adventure, HomePageContent } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -40,13 +40,9 @@ function AdventuresLoading() {
 
 
 export default function Home() {
-  const firestore = useFirestore();
-
-  const adventuresQuery = useMemoFirebase(() => collection(firestore, 'adventures'), [firestore]);
-  const homePageContentRef = useMemoFirebase(() => doc(firestore, 'content', 'homepage'), [firestore]);
-
-  const { data: adventures, isLoading: isLoadingAdventures } = useCollection<Adventure>(adventuresQuery);
-  const { data: homePageContent, isLoading: isLoadingContent } = useDoc<HomePageContent>(homePageContentRef);
+  const { data: adventures, isLoading: isLoadingAdventures } = useCollection<Adventure>('adventures');
+  const { data: homePageDoc, isLoading: isLoadingContent } = useDoc<{ data: HomePageContent }>('content', 'homepage');
+  const homePageContent = homePageDoc?.data ?? null;
 
   if (isLoadingContent || !homePageContent) {
     return (
