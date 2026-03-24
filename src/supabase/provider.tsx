@@ -4,8 +4,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { SupabaseClient, User, AuthChangeEvent, Session } from '@supabase/supabase-js'
 import { getSupabaseClient } from './config'
 
-// TODO: Create SupabaseErrorListener component at @/components/SupabaseErrorListener
-// import { SupabaseErrorListener } from '@/components/SupabaseErrorListener'
+import { SupabaseErrorListener } from '@/components/SupabaseErrorListener'
 
 interface SupabaseContextValue {
   supabase: SupabaseClient
@@ -45,7 +44,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <SupabaseContext.Provider value={{ supabase, user, loading, isAdmin }}>
-      {/* TODO: Add <SupabaseErrorListener /> once the component is created */}
+      <SupabaseErrorListener />
       {children}
     </SupabaseContext.Provider>
   )
