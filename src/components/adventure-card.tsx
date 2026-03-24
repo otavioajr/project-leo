@@ -29,10 +29,10 @@ export function AdventureCard({ adventure }: AdventureCardProps) {
       <CardHeader className="p-0">
         <Link href={`/adventures/${adventureSlug}`} className="block">
           <div className="relative h-48 w-full">
-            {adventure.imageUrl ? (
+            {adventure.image_url ? (
               <Image
-                src={adventure.imageUrl}
-                alt={adventure.imageDescription}
+                src={adventure.image_url}
+                alt={adventure.image_description}
                 fill
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"

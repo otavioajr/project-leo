@@ -2,24 +2,21 @@
 
 import Link from "next/link";
 import { Mountain } from "lucide-react";
-import { useCollection, useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { useCollection } from "@/supabase/use-collection";
+import { useDoc } from "@/supabase/use-doc";
 import type { ContentPage, HomePageContent } from "@/lib/types";
 
 export function Footer() {
-  const firestore = useFirestore();
+  const { data: allPages } = useCollection<ContentPage>('pages');
 
-  const pagesQuery = useMemoFirebase(() => collection(firestore, 'pages'), [firestore]);
-  const { data: allPages } = useCollection<ContentPage>(pagesQuery);
-  
   // Filtra e ordena no cliente para evitar problemas de índice composto
   const dynamicPages = allPages
-    ?.filter(p => p.showInHeader === true)
-    ?.sort((a, b) => (a.navOrder ?? 0) - (b.navOrder ?? 0));
+    ?.filter(p => p.show_in_header === true)
+    ?.sort((a, b) => (a.nav_order ?? 0) - (b.nav_order ?? 0));
 
   // Buscar configurações de redes sociais
-  const contentRef = useMemoFirebase(() => doc(firestore, 'content', 'homepage'), [firestore]);
-  const { data: homeContent } = useDoc<HomePageContent>(contentRef);
+  const { data: homeContentDoc } = useDoc<{ data: HomePageContent }>('content', 'homepage');
+  const homeContent = homeContentDoc?.data ?? null;
 
   return (
     <footer className="border-t bg-background">

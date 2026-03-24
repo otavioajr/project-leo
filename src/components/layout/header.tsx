@@ -11,8 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, where, orderBy } from "firebase/firestore";
+import { useCollection } from "@/supabase/use-collection";
 import type { ContentPage } from "@/lib/types";
 import { Skeleton } from "../ui/skeleton";
 import { BrandLogo } from "./brand-logo";
@@ -25,15 +24,12 @@ const staticLinks = [
 
 export function Header() {
   const pathname = usePathname();
-  const firestore = useFirestore();
+  const { data: allPages, isLoading } = useCollection<ContentPage>('pages');
 
-  const pagesQuery = useMemoFirebase(() => collection(firestore, 'pages'), [firestore]);
-  const { data: allPages, isLoading } = useCollection<ContentPage>(pagesQuery);
-  
   // Filtra e ordena no cliente para evitar problemas de índice composto
   const dynamicPages = allPages
-    ?.filter(p => p.showInHeader === true)
-    ?.sort((a, b) => (a.navOrder ?? 0) - (b.navOrder ?? 0));
+    ?.filter(p => p.show_in_header === true)
+    ?.sort((a, b) => (a.nav_order ?? 0) - (b.nav_order ?? 0));
 
   const navLinks = [
     ...staticLinks,
