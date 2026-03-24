@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { useSupabase } from '@/supabase/hooks';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +17,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const auth = useAuth();
+  const supabase = useSupabase();
   const { toast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -26,21 +25,24 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      toast({ title: 'Login bem-sucedido!' });
-      router.push('/admin');
-    } catch (err: any) {
-      let message = 'Credenciais inválidas ou erro desconhecido.';
-      if (err.code === 'auth/invalid-credential') {
-        message = 'Email ou senha incorretos. Por favor, tente novamente.';
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        const message = 'Email ou senha incorretos. Por favor, tente novamente.';
+        setError(message);
+        toast({ title: 'Erro de Login', description: message, variant: 'destructive' });
+      } else {
+        toast({ title: 'Login bem-sucedido!' });
+        router.push('/admin');
       }
+    } catch {
+      const message = 'Credenciais inválidas ou erro desconhecido.';
       setError(message);
       toast({ title: 'Erro de Login', description: message, variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   const handleSignUp = async () => {
     if (!email || !password) {
         toast({
@@ -53,20 +55,20 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      toast({
-        title: 'Conta Criada com Sucesso!',
-        description: `Agora, siga o passo-a-passo para tornar ${userCredential.user.email} um administrador.`,
-      });
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setError(error.message);
+        toast({ title: 'Erro ao Criar Conta', description: error.message, variant: 'destructive' });
+      } else {
+        toast({
+          title: 'Conta Criada com Sucesso!',
+          description: `Agora, siga o passo-a-passo para tornar ${data.user?.email} um administrador.`,
+        });
+      }
       // Don't redirect, let them see the next step instructions
-    } catch (err: any) {
-        let message = 'Não foi possível criar a conta.';
-        if (err.code === 'auth/email-already-in-use') {
-            message = 'Este endereço de e-mail já está em uso.';
-        } else if (err.code === 'auth/weak-password') {
-            message = 'A senha é muito fraca. Use pelo menos 6 caracteres.';
-        }
-      setError(err.message);
+    } catch {
+      const message = 'Não foi possível criar a conta.';
+      setError(message);
       toast({ title: 'Erro ao Criar Conta', description: message, variant: 'destructive' });
     } finally {
       setIsLoading(false);
@@ -102,9 +104,9 @@ export default function LoginPage() {
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="password">Senha</Label>
-                        <Input 
-                            id="password" 
-                            type="password" 
+                        <Input
+                            id="password"
+                            type="password"
                             required
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
@@ -128,12 +130,11 @@ export default function LoginPage() {
                 <CardTitle className="text-lg font-headline">Como se tornar um Administrador</CardTitle>
              </CardHeader>
              <CardContent className="text-sm text-muted-foreground space-y-2">
-                <p>1. Preencha o email e senha acima e clique em <strong>"Crie uma agora"</strong>.</p>
-                <p>2. Abra o <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Console do Firebase</a> do seu projeto.</p>
-                <p>3. Vá para <strong>Firestore Database</strong>, e crie uma coleção chamada <code>roles_admin</code>.</p>
-                <p>4. Dentro de <code>roles_admin</code>, crie um novo documento. O ID do documento deve ser o <strong>UID do usuário</strong> que você acabou de criar (você pode encontrar o UID na aba <strong>Authentication</strong> do Firebase).</p>
-                <p>5. Nesse documento, adicione um campo booleano chamado <code>isAdmin</code> e defina o valor como <code>true</code>.</p>
-                <p>6. Volte para esta página e faça login com as credenciais que você criou.</p>
+                <p>1. Preencha o email e senha acima e clique em <strong>{'"Crie uma agora"'}</strong>.</p>
+                <p>2. Abra o painel do <strong>Supabase</strong> do seu projeto.</p>
+                <p>3. Vá para <strong>Authentication {'>'} Users</strong> e encontre o usuário que você criou.</p>
+                <p>4. No <strong>SQL Editor</strong>, execute: <code>{"UPDATE auth.users SET raw_app_meta_data = raw_app_meta_data || '{\"is_admin\": true}' WHERE email = 'SEU_EMAIL';"}</code></p>
+                <p>5. Volte para esta página e faça login com as credenciais que você criou.</p>
              </CardContent>
         </Card>
     </div>
