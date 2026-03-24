@@ -7,49 +7,37 @@ import { Badge } from '@/components/ui/badge';
 import { DollarSign, Timer, BarChart, MapPin, Info, LoaderCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RegistrationForm } from './_components/registration-form';
-import { useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { useSupabase } from '@/supabase/hooks';
 import type { Adventure } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect } from 'react';
 
 // Custom hook para buscar a aventura
-function useFetchAdventure(slug: string, firestore: any) {
+function useFetchAdventure(slug: string) {
+  const supabase = useSupabase();
   const [adventure, setAdventure] = useState<Adventure | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    async function fetchAdventure() {
-      if (!slug) {
-        setAdventure(null);
-        setIsLoading(false);
-        setError(null);
-        return;
-      }
-
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const q = query(collection(firestore, 'adventures'), where('slug', '==', slug));
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-          const doc = querySnapshot.docs[0];
-          setAdventure({ ...(doc.data() as Adventure), id: doc.id });
-        } else {
-          setAdventure(null);
-        }
-        setIsLoading(false);
-      } catch (err) {
-        setError(err as Error);
-        setIsLoading(false);
-      }
+    if (!slug) {
+      setAdventure(null);
+      setIsLoading(false);
+      return;
     }
 
-    fetchAdventure();
-  }, [firestore, slug]);
+    setIsLoading(true);
+    supabase
+      .from('adventures')
+      .select()
+      .eq('slug', slug)
+      .single()
+      .then(({ data, error }) => {
+        if (error) setError(new Error(error.message));
+        else setAdventure(data as Adventure);
+        setIsLoading(false);
+      });
+  }, [supabase, slug]);
 
   return { adventure, isLoading, error };
 }
@@ -57,9 +45,8 @@ function useFetchAdventure(slug: string, firestore: any) {
 export default function AdventurePage() {
   const params = useParams();
   const slug = params.slug as string;
-  const firestore = useFirestore();
 
-  const { adventure, isLoading, error } = useFetchAdventure(slug, firestore);
+  const { adventure, isLoading, error } = useFetchAdventure(slug);
 
   if (isLoading) {
     return (
@@ -105,10 +92,10 @@ export default function AdventurePage() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
         <div className="lg:col-span-3">
           <div className="relative h-[400px] md:h-[500px] w-full mb-8 rounded-lg overflow-hidden shadow-lg">
-            {adventure.imageUrl && (
+            {adventure.image_url && (
               <Image
-                src={adventure.imageUrl}
-                alt={adventure.imageDescription}
+                src={adventure.image_url}
+                alt={adventure.image_description}
                 fill
                 className="object-cover"
                 priority
@@ -118,7 +105,7 @@ export default function AdventurePage() {
           <h1 className="font-headline text-3xl md:text-4xl font-bold text-primary mb-4">{adventure.title}</h1>
           <p className="text-lg text-muted-foreground mb-6">{adventure.description}</p>
           <div className="prose max-w-none text-foreground">
-            <p>{adventure.longDescription}</p>
+            <p>{adventure.long_description}</p>
           </div>
         </div>
         <div className="lg:col-span-2">
@@ -150,18 +137,18 @@ export default function AdventurePage() {
               </CardContent>
             </Card>
 
-            {adventure.registrationsEnabled ? (
+            {adventure.registrations_enabled ? (
               <Card>
                 <CardHeader>
                   <CardTitle className="font-headline">Reserve Seu Lugar</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <RegistrationForm 
-                    adventureId={adventure.id} 
+                  <RegistrationForm
+                    adventureId={adventure.id}
                     adventureTitle={adventure.title}
                     adventureSlug={adventure.slug}
                     adventurePrice={adventure.price}
-                    customFields={adventure.customFields} 
+                    customFields={adventure.custom_fields}
                   />
                 </CardContent>
               </Card>
