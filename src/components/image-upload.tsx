@@ -1,11 +1,9 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { useStorage } from "@/firebase";
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
+import { useSupabase } from "@/supabase/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { Upload, X, Image as ImageIcon, Link as LinkIcon, LoaderCircle } from "lucide-react";
 import Image from "next/image";
@@ -18,16 +16,15 @@ type ImageUploadProps = {
   disabled?: boolean;
 };
 
-export function ImageUpload({ 
-  value, 
-  onChange, 
+export function ImageUpload({
+  value,
+  onChange,
   folder = "images",
   className,
-  disabled = false 
+  disabled = false
 }: ImageUploadProps) {
-  const storage = useStorage();
+  const supabase = useSupabase();
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlInput, setUrlInput] = useState("");
@@ -51,48 +48,30 @@ export function ImageUpload({
 
     setError(null);
     setIsUploading(true);
-    setUploadProgress(0);
 
     try {
       // Create unique filename
       const timestamp = Date.now();
       const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
       const fileName = `${folder}/${timestamp}-${sanitizedName}`;
-      const storageRef = ref(storage, fileName);
 
-      // Upload with progress tracking
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      const { data, error: uploadError } = await supabase.storage.from('images').upload(fileName, file);
+      if (uploadError) throw uploadError;
 
-      uploadTask.on(
-        "state_changed",
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-        },
-        (uploadError) => {
-          console.error("Upload error:", uploadError);
-          setError("Erro ao enviar imagem. Tente novamente.");
-          setIsUploading(false);
-        },
-        async () => {
-          // Upload completed
-          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-          onChange(downloadUrl);
-          setIsUploading(false);
-          setUploadProgress(0);
-        }
-      );
+      const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
+      onChange(publicUrl);
     } catch (err) {
       console.error("Upload failed:", err);
       setError("Erro ao enviar imagem. Tente novamente.");
+    } finally {
       setIsUploading(false);
     }
-  }, [storage, folder, onChange]);
+  }, [supabase, folder, onChange]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (disabled || isUploading) return;
-    
+
     const file = e.dataTransfer.files[0];
     if (file) {
       handleFileSelect(file);
@@ -113,19 +92,22 @@ export function ImageUpload({
   const handleRemoveImage = useCallback(async () => {
     if (!value) return;
 
-    // If it's a Firebase Storage URL, try to delete the file
-    if (value.includes("firebasestorage.googleapis.com") || value.includes("firebasestorage.app")) {
+    // If it's a Supabase Storage URL, try to delete the file
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (supabaseUrl && value.includes(supabaseUrl)) {
       try {
-        const imageRef = ref(storage, value);
-        await deleteObject(imageRef);
+        const urlObj = new URL(value);
+        const pathMatch = urlObj.pathname.match(/\/storage\/v1\/object\/public\/images\/(.+)/);
+        if (pathMatch) {
+          await supabase.storage.from('images').remove([pathMatch[1]]);
+        }
       } catch (err) {
-        // File might not exist or user doesn't have permission - that's ok
         console.warn("Could not delete image from storage:", err);
       }
     }
 
     onChange("");
-  }, [value, storage, onChange]);
+  }, [value, supabase, onChange]);
 
   const handleUrlSubmit = useCallback(() => {
     if (urlInput.trim()) {
@@ -167,8 +149,8 @@ export function ImageUpload({
           onDragOver={handleDragOver}
           className={cn(
             "relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors",
-            isUploading 
-              ? "border-primary bg-primary/5" 
+            isUploading
+              ? "border-primary bg-primary/5"
               : "border-muted-foreground/25 hover:border-primary/50",
             disabled && "opacity-50 cursor-not-allowed"
           )}
@@ -176,9 +158,8 @@ export function ImageUpload({
           {isUploading ? (
             <div className="flex flex-col items-center gap-3 w-full">
               <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
-              <Progress value={uploadProgress} className="w-full max-w-xs" />
               <p className="text-sm text-muted-foreground">
-                Enviando... {Math.round(uploadProgress)}%
+                Enviando...
               </p>
             </div>
           ) : (
