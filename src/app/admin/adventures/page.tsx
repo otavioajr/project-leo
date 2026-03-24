@@ -26,14 +26,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { useCollection } from "@/supabase/use-collection";
 import type { Adventure } from "@/lib/types";
 
 export default function AdventuresPage() {
-  const firestore = useFirestore();
-  const adventuresQuery = useMemoFirebase(() => collection(firestore, 'adventures'), [firestore]);
-  const { data: adventures, isLoading } = useCollection<Adventure>(adventuresQuery);
+  const { data: adventures, isLoading } = useCollection<Adventure>('adventures');
 
   return (
     <Card>
@@ -80,8 +77,8 @@ export default function AdventuresPage() {
                 <TableRow key={adventure.id}>
                   <TableCell className="font-medium">{adventure.title}</TableCell>
                   <TableCell>
-                    <Badge variant={adventure.registrationsEnabled ? "default" : "outline"}>
-                      {adventure.registrationsEnabled ? "Abertas" : "Fechadas"}
+                    <Badge variant={adventure.registrations_enabled ? "default" : "outline"}>
+                      {adventure.registrations_enabled ? "Abertas" : "Fechadas"}
                     </Badge>
                   </TableCell>
                   <TableCell>R${adventure.price.toFixed(2)}</TableCell>

@@ -7,8 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { Adventure } from "@/lib/types";
-import { useFirebase } from "@/firebase";
-import { doc, setDoc, addDoc, deleteDoc, collection } from "firebase/firestore";
+import { useSupabase } from "@/supabase/hooks";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -89,25 +88,25 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const { firestore } = useFirebase();
+  const supabase = useSupabase();
 
   const form = useForm<AdventureFormValues>({
     resolver: zodResolver(adventureSchema),
     defaultValues: {
       title: adventure?.title || "",
       description: adventure?.description || "",
-      longDescription: adventure?.longDescription || "",
+      longDescription: adventure?.long_description || "",
       price: adventure?.price || 0,
       duration: adventure?.duration || "",
       location: adventure?.location || "",
       difficulty: adventure?.difficulty || "Moderado",
-      imageUrl: adventure?.imageUrl || "",
-      imageDescription: adventure?.imageDescription || "",
-      registrationsEnabled: adventure?.registrationsEnabled ?? true,
-      customFields: adventure?.customFields || [],
+      imageUrl: adventure?.image_url || "",
+      imageDescription: adventure?.image_description || "",
+      registrationsEnabled: adventure?.registrations_enabled ?? true,
+      customFields: adventure?.custom_fields || [],
     },
   });
-  
+
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "customFields",
@@ -115,20 +114,31 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
 
   async function onSubmit(values: AdventureFormValues) {
     setIsSubmitting(true);
-    
+
     const adventureData = {
-      ...values,
       slug: createSlug(values.title),
+      title: values.title,
+      description: values.description,
+      long_description: values.longDescription,
+      price: values.price,
+      duration: values.duration,
+      location: values.location,
+      difficulty: values.difficulty,
+      image_url: values.imageUrl,
+      image_description: values.imageDescription,
+      registrations_enabled: values.registrationsEnabled,
+      custom_fields: values.customFields || [],
     };
 
     try {
       if (adventure?.id) {
-        const adventureRef = doc(firestore, "adventures", adventure.id);
-        await setDoc(adventureRef, adventureData, { merge: true });
+        const { error } = await supabase.from('adventures').update(adventureData).eq('id', adventure.id);
+        if (error) throw error;
       } else {
-        await addDoc(collection(firestore, "adventures"), adventureData);
+        const { error } = await supabase.from('adventures').insert(adventureData);
+        if (error) throw error;
       }
-      
+
       toast({
         title: adventure ? "Aventura Atualizada" : "Aventura Criada",
         description: `"${values.title}" foi salva.`,
@@ -146,12 +156,13 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
 
     setIsSubmitting(false);
   }
-  
+
   async function handleDelete() {
     if (!adventure) return;
     setIsDeleting(true);
     try {
-      await deleteDoc(doc(firestore, "adventures", adventure.id));
+      const { error } = await supabase.from('adventures').delete().eq('id', adventure.id);
+      if (error) throw error;
       toast({
             title: "Aventura Excluída",
             description: `"${adventure.title}" foi removida.`,
@@ -334,11 +345,11 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
         </div>
 
         <Separator />
-        
+
         <div>
             <h3 className="text-xl font-headline font-semibold mb-4">Construtor de Formulário de Inscrição</h3>
             <FormDescription className="mb-4">Configure os campos adicionais para coletar informações dos participantes.</FormDescription>
-            
+
             {/* Campos fixos do sistema */}
             <div className="mb-6 p-4 border rounded-lg bg-muted/30">
               <h4 className="text-sm font-medium mb-3">Campos do Sistema (incluídos automaticamente)</h4>

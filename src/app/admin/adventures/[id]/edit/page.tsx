@@ -5,18 +5,15 @@ import Link from "next/link";
 import { AdventureForm } from "../../_components/adventure-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useDoc } from "@/supabase/use-doc";
 import type { Adventure } from "@/lib/types";
 import { LoaderCircle, AlertCircle } from "lucide-react";
 
 export default function EditAdventurePage() {
   const params = useParams();
   const id = params.id as string;
-  const firestore = useFirestore();
-  
-  const adventureRef = useMemoFirebase(() => doc(firestore, 'adventures', id), [firestore, id]);
-  const { data: adventure, isLoading } = useDoc<Adventure>(adventureRef);
+
+  const { data: adventure, isLoading } = useDoc<Adventure>('adventures', id);
 
   if (isLoading) {
     return (
