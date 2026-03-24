@@ -18,7 +18,7 @@ import {
 import { Mountain, LayoutDashboard, Compass, ListChecks, Home, FileText, LoaderCircle, LogOut, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsAdmin } from "@/hooks/use-is-admin";
-import { useAuth, useUser } from "@/firebase";
+import { useSupabase, useUser } from "@/supabase/hooks";
 
 const navItems = [
   { href: "/admin", label: "Painel", icon: LayoutDashboard },
@@ -36,9 +36,9 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isUserLoading } = useUser();
+  const { user, loading: isUserLoading } = useUser();
   const { isAdmin, isAdminLoading } = useIsAdmin();
-  const auth = useAuth();
+  const supabase = useSupabase();
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -47,10 +47,10 @@ export default function AdminLayout({
   }, [isUserLoading, user, router]);
 
   const handleSignOut = async () => {
-    await auth.signOut();
+    await supabase.auth.signOut();
     router.push('/login');
   };
-  
+
   if (isUserLoading || isAdminLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
@@ -77,7 +77,7 @@ export default function AdminLayout({
       </div>
     );
   }
-  
+
   return (
     <SidebarProvider>
       <Sidebar>
