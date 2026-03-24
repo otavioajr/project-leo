@@ -17,8 +17,7 @@ import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
 import { Separator } from "@/components/ui/separator";
 import type { CustomField } from "@/lib/types";
-import { useFirebase } from "@/firebase";
-import { addDoc, collection, serverTimestamp, getDoc, doc } from "firebase/firestore";
+import { useSupabase } from "@/supabase/hooks";
 import { useRouter } from "next/navigation";
 
 const participantSchema = z.object({
@@ -48,7 +47,7 @@ type RegistrationFormProps = {
 export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, adventurePrice, customFields }: RegistrationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { firestore } = useFirebase();
+  const supabase = useSupabase();
   const router = useRouter();
 
   const initialCustomData: Record<string, string> = {};
@@ -97,10 +96,10 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
 
   async function onSubmit(values: RegistrationFormValues) {
     setIsSubmitting(true);
-    
+
     // Manual validation for required custom fields
     let isValid = true;
-    
+
     // Validar campos customizados do contato principal
     customFields?.forEach(cf => {
       if (cf.required && !values.customData?.[cf.name]) {
@@ -111,7 +110,7 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
         isValid = false;
       }
     });
-    
+
     // Validar campos customizados dos participantes adicionais
     values.participants.forEach((participant, pIndex) => {
         customFields?.forEach(cf => {
@@ -137,21 +136,28 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
 
     try {
       const totalAmount = adventurePrice * values.groupSize;
-      
-      const docRef = await addDoc(collection(firestore, "registrations"), {
-        ...values,
-        adventureId,
-        adventureTitle,
-        registrationDate: serverTimestamp(),
-        paymentStatus: "pending",
-        totalAmount,
-        registrationToken: crypto.randomUUID(),
-      });
 
-      // Redirecionar para página de pagamento
-      const registrationDoc = await getDoc(docRef);
-      const token = registrationDoc.data()?.registrationToken;
-      router.push(`/adventures/${adventureSlug}/pagamento?registrationId=${docRef.id}&token=${token}`);
+      const { data, error } = await supabase
+        .from('registrations')
+        .insert({
+          adventure_id: adventureId,
+          adventure_title: adventureTitle,
+          name: values.name,
+          email: values.email,
+          phone: values.phone,
+          group_size: values.groupSize,
+          participants: values.participants,
+          custom_data: values.customData || {},
+          payment_status: 'pending',
+          total_amount: totalAmount,
+          // registration_date and registration_token have DEFAULT values in PostgreSQL
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      router.push(`/adventures/${adventureSlug}/pagamento?registrationId=${data.id}&token=${data.registration_token}`);
     } catch (error) {
       console.error("Registration failed:", error);
       toast({
@@ -231,9 +237,9 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
               <FormItem>
                 <FormLabel>{customField.label}{customField.required && <span className="text-destructive">*</span>}</FormLabel>
                 <FormControl>
-                  <Input 
+                  <Input
                     placeholder={customField.label}
-                    type={customField.type} 
+                    type={customField.type}
                     {...field}
                   />
                 </FormControl>
@@ -270,9 +276,9 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
                         <FormItem>
                             <FormLabel>{customField.label}{customField.required && <span className="text-destructive">*</span>}</FormLabel>
                             <FormControl>
-                                <Input 
+                                <Input
                                     placeholder={customField.label}
-                                    type={customField.type} 
+                                    type={customField.type}
                                     {...field}
                                 />
                             </FormControl>
