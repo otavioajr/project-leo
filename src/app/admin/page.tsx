@@ -17,8 +17,7 @@ import {
 import { Compass, ListChecks, User, Mail, Phone, Users, LoaderCircle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, Timestamp } from "firebase/firestore";
+import { useCollection } from "@/supabase/use-collection";
 import type { Adventure, Registration } from "@/lib/types";
 
 function formatFieldName(name: string) {
@@ -26,20 +25,11 @@ function formatFieldName(name: string) {
     return words.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
-type FirestoreRegistration = Omit<Registration, 'registrationDate'> & {
-  registrationDate: Timestamp;
-};
-
 export default function AdminDashboard() {
-  const firestore = useFirestore();
-  
-  const adventuresQuery = useMemoFirebase(() => collection(firestore, 'adventures'), [firestore]);
-  const registrationsQuery = useMemoFirebase(() => collection(firestore, 'registrations'), [firestore]);
+  const { data: adventures, isLoading: isLoadingAdventures } = useCollection<Adventure>('adventures');
+  const { data: registrations, isLoading: isLoadingRegistrations } = useCollection<Registration>('registrations');
 
-  const { data: adventures, isLoading: isLoadingAdventures } = useCollection<Adventure>(adventuresQuery);
-  const { data: registrations, isLoading: isLoadingRegistrations } = useCollection<FirestoreRegistration>(registrationsQuery);
-  
-  const totalParticipants = registrations?.reduce((acc, reg) => acc + reg.groupSize, 0) || 0;
+  const totalParticipants = registrations?.reduce((acc, reg) => acc + reg.group_size, 0) || 0;
   const recentRegistrations = registrations?.slice(0, 5) || [];
 
   if (isLoadingAdventures || isLoadingRegistrations) {
@@ -77,7 +67,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{totalParticipants}</div>
             <p className="text-xs text-muted-foreground">
-              em {registrations?.length || 0} inscrições
+              em {registrations?.length || 0} inscricoes
             </p>
           </CardContent>
         </Card>
@@ -85,7 +75,7 @@ export default function AdminDashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Inscrições Recentes</CardTitle>
+          <CardTitle>Inscricoes Recentes</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -100,11 +90,11 @@ export default function AdminDashboard() {
               {recentRegistrations.length > 0 ? (
                 recentRegistrations.map((reg) => (
                   <TableRow key={reg.id}>
-                    <TableCell className="font-medium">{reg.adventureTitle}</TableCell>
+                    <TableCell className="font-medium">{reg.adventure_title}</TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         <span className="font-medium flex items-center gap-2"><User className="h-3 w-3" />{reg.name}</span>
-                        <span className="text-sm text-muted-foreground flex items-center gap-2"><Users className="h-3 w-3" />{reg.groupSize} {reg.groupSize > 1 ? 'pessoas' : 'pessoa'}</span>
+                        <span className="text-sm text-muted-foreground flex items-center gap-2"><Users className="h-3 w-3" />{reg.group_size} {reg.group_size > 1 ? 'pessoas' : 'pessoa'}</span>
                         {reg.participants && reg.participants.length > 0 && (
                             <div className="pl-5 py-1 text-sm text-muted-foreground border-l border-dashed ml-1.5 space-y-2">
                                 {reg.participants.map((p, i) => (
@@ -125,14 +115,14 @@ export default function AdminDashboard() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {format(reg.registrationDate.toDate(), "PPP p", { locale: ptBR })}
+                      {format(new Date(reg.registration_date), "PPP p", { locale: ptBR })}
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center">
-                    Nenhuma inscrição ainda.
+                    Nenhuma inscricao ainda.
                   </TableCell>
                 </TableRow>
               )}
