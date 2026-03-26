@@ -22,8 +22,24 @@ Redesign completo de ponta a ponta do site CHAVES Adventure, elevando cada compo
 | `--muted` | `0 0% 96.1%` | `40 15% 94%` | Tom quente acompanhando o background |
 | `--muted-foreground` | `0 0% 45.1%` | `30 5% 40%` | Melhor contraste |
 | `--radius` | `0.5rem` | `0.75rem` | Bordas mais suaves, feeling moderno |
+| `--footer-bg` | (novo) | `145 40% 10%` | Fundo escuro do footer |
 
-Dark mode: ajustar proporcionalmente mantendo a mesma direção.
+### Dark mode (CSS variables)
+
+| Token | Novo |
+|-------|------|
+| `--primary` | `145 40% 50%` |
+| `--secondary` | `24 90% 50%` |
+| `--background` | `150 8% 8%` |
+| `--foreground` | `40 10% 95%` |
+| `--muted` | `150 5% 14%` |
+| `--muted-foreground` | `40 5% 60%` |
+
+### Motion system
+
+- **Micro-interactions** (hovers, focus): `duration-200 ease-out`
+- **Layout transitions** (header scroll, card hover scale): `duration-500 ease-out`
+- **Easing padrão:** `ease-out` para todas as animações
 
 ### Tipografia
 
@@ -39,9 +55,10 @@ Atualizar Google Fonts link no root layout e `font-headline` no tailwind config.
 ## 2. Header
 
 ### Comportamento
-- **Sobre o hero (home):** transparente, texto branco, logo branco
+- **Sobre o hero (home e adventure detail):** transparente, texto branco, logo branco — aplica-se a qualquer página com imagem full-bleed no topo
 - **Scroll / outras páginas:** fundo sólido `bg-background/95 backdrop-blur`
-- Transição via scroll event listener com threshold (~50px)
+- Transição via scroll event listener com threshold de 50px
+- Implementação: prop `transparent?: boolean` no Header, controlada pelo layout pai ou pela página
 
 ### Visual
 - Links com underline animado no hover (barra inferior que cresce do centro via pseudo-element `::after` com `scale-x` transition)
@@ -50,19 +67,21 @@ Atualizar Google Fonts link no root layout e `font-headline` no tailwind config.
 
 ### Componentes afetados
 - `src/components/layout/header.tsx`
-- `src/components/layout/brand-logo.tsx` (variante clara para header transparente)
+- `src/components/layout/brand-logo.tsx` (prop `variant?: 'default' | 'light'` — light usa `text-white` nas fontes brand/adventure e `text-white` no ícone Mountain)
 
 ---
 
 ## 3. Footer
 
 ### Visual
-- Fundo escuro: `hsl(145, 40%, 10%)` com texto claro
-- Borda superior com gradiente sutil (primary → secondary)
+- Fundo escuro via CSS variable `--footer-bg: 145 40% 10%` (adicionado aos tokens)
+- Borda superior: pseudo-element `::before` com `h-[2px]` e `bg-gradient-to-r from-primary via-secondary to-primary`
 - Layout 3 colunas: marca + descrição | links de nav | redes sociais com ícones SVG
 
 ### Redes sociais
-- Substituir texto ("Facebook", "Instagram") por ícones SVG inline (lucide ou SVG custom)
+- Substituir texto ("Facebook", "Instagram") por ícones SVG inline do Lucide (`Facebook`, `Instagram`, `Twitter`)
+- Hover: `text-white/60 hover:text-white transition-colors duration-200`
+- Cada ícone-link com `aria-label` descritivo (ex: `aria-label="Facebook"`)
 
 ### Componentes afetados
 - `src/components/layout/footer.tsx`
@@ -76,8 +95,8 @@ Atualizar Google Fonts link no root layout e `font-headline` no tailwind config.
 - Overlay: gradiente diagonal `bg-gradient-to-tr from-black/70 via-black/30 to-transparent` (substitui `bg-black/50`)
 - Título: `text-5xl md:text-7xl font-headline font-extrabold`
 - Subtítulo: `max-w-xl` com opacidade maior
-- CTA: pill shape (`rounded-full`), fundo secondary, seta com `hover:translate-x-1`
-- Divisor decorativo abaixo do hero: `div` com gradiente horizontal que desvanece nas pontas
+- CTA: pill shape (`rounded-full`), fundo secondary, `text-lg font-bold`, ícone `ArrowRight` (Lucide) com `hover:translate-x-1`
+- Divisor decorativo abaixo do hero: `div` com `h-px max-w-md mx-auto bg-gradient-to-r from-transparent via-border to-transparent`
 
 ### Seção de Aventuras
 - Padding: `py-16 md:py-28`
@@ -95,12 +114,12 @@ Atualizar Google Fonts link no root layout e `font-headline` no tailwind config.
 - Imagem: `h-56` (up de `h-48`)
 - Overlay gradiente na parte inferior da imagem (`from-transparent via-transparent to-black/70`)
 - Título posicionado **sobre** a imagem, na parte inferior, texto branco
-- Badge de dificuldade no canto superior direito, com `backdrop-blur-sm bg-white/20`
+- Badge de dificuldade no canto superior direito, com `backdrop-blur-sm bg-white/20 text-white`
 
 ### Hover
 - Imagem: `hover:scale-105` com `transition-transform duration-500`, container com `overflow-hidden`
 - Card: elevação sutil na sombra
-- Botão "Saiba Mais": transição de outline para preenchido
+- Botão "Saiba Mais": transição de outline para preenchido com `bg-primary text-primary-foreground` (`duration-200 ease-out`)
 
 ### Informações
 - Preço: `font-bold text-primary`
@@ -127,12 +146,13 @@ Atualizar Google Fonts link no root layout e `font-headline` no tailwind config.
 ### Card lateral
 - Ícones em círculos com fundo `bg-primary/10 rounded-full p-2`
 - Preço em destaque: `text-3xl font-bold`
-- Participantes com borda lateral colorida (accent bar esquerda) em vez de borda completa
+- No mobile: card empilha abaixo do conteúdo (manter comportamento atual `lg:col-span-2`), sem sticky no mobile
+- Participantes com accent bar esquerda: `border-l-4 border-secondary pl-4` (sem borda completa)
 
 ### Formulário
 - Inputs `rounded-xl` com bordas sutis, consistente com login
-- Botão submit: secondary, pill shape
-- Seções de participantes: borda lateral accent
+- Botão submit: secondary, pill shape (`rounded-full`)
+- Seções de participantes: `border-l-4 border-secondary pl-4` (accent bar pattern reutilizado)
 
 ### Componentes afetados
 - `src/app/(main)/adventures/[slug]/page.tsx`
@@ -148,7 +168,11 @@ Atualizar Google Fonts link no root layout e `font-headline` no tailwind config.
 - QR Code: moldura arredondada com sombra
 - Código PIX: fundo escuro `bg-foreground text-background font-mono rounded-lg` — visual de terminal
 - Botão "Já Paguei": secondary, pill shape
-- Estados de confirmação: ícones maiores, melhor hierarquia
+- Estados de pagamento:
+  - **pending:** card padrão com QR + botão "Já Paguei"
+  - **awaiting_confirmation:** ícone `Clock` em `h-20 w-20 text-amber-500`, título "Aguardando Confirmação", mensagem abaixo
+  - **confirmed:** ícone `CheckCircle2` em `h-20 w-20 text-green-500`, título "Pagamento Confirmado"
+  - **Erro/não encontrado:** ícone `AlertTriangle` em `h-20 w-20 text-destructive`, título em `text-destructive`
 
 ### Componentes afetados
 - `src/app/(main)/adventures/[slug]/pagamento/page.tsx`
@@ -169,8 +193,8 @@ Atualizar Google Fonts link no root layout e `font-headline` no tailwind config.
 
 ## 9. Páginas de Conteúdo Dinâmico
 
-- Estilos `.content-page` refinados: melhor espaçamento, headings com accent bar
-- `max-w-3xl` (down de `max-w-4xl`) para melhor leitura
+- Estilos `.content-page` refinados: melhor espaçamento entre seções (`mt-10 mb-5`), headings com accent bar (`border-l-4 border-secondary pl-4` — mesma pattern dos participantes)
+- `max-w-3xl` (down de `max-w-4xl`) para melhor leitura. Imagens dentro de `.content-page img` recebem `max-w-full w-full rounded-xl` — escalam dentro do container, sem break-out
 
 ### Componentes afetados
 - `src/app/(main)/pages/[slug]/page.tsx`
@@ -196,9 +220,23 @@ Atualizar Google Fonts link no root layout e `font-headline` no tailwind config.
 | `src/app/(auth)/login/page.tsx` | Ajustes de cor e tipografia |
 | `src/app/(main)/pages/[slug]/page.tsx` | Max-width e estilos |
 
+## 11. Loading & Empty States
+
+- **Skeletons:** mantêm a estrutura atual. O novo `--radius: 0.75rem` será aplicado automaticamente via o componente `Skeleton` do shadcn que usa `rounded-md`. Não requer mudanças manuais em cada skeleton
+- **Spinners:** manter `LoaderCircle` do Lucide com `text-primary`
+- **Empty state (grid sem aventuras):** mensagem centralizada com ícone `Mountain` grande em `text-muted-foreground/30` e texto "Nenhuma aventura disponível no momento"
+
+## 12. Acessibilidade
+
+- Paleta validada para WCAG AA:
+  - `--primary` (verde escuro) sobre `--background` (off-white): ratio ~9:1 (passa)
+  - `--secondary` (laranja) como fundo de botão com texto branco: ratio ~3.5:1 — usar `font-bold` e `text-lg` mínimo em botões secondary para compensar (large text passa AA a 3:1)
+  - `--foreground` sobre `--background`: ratio ~14:1 (passa)
+
 ## Fora de escopo
 
 - Admin dashboard (não é público, prioridade menor)
 - Funcionalidades novas (foco exclusivo em visual/UX)
-- Dark mode (ajustar proporcionalmente, sem redesign dedicado)
+- Dark mode (tokens definidos na seção 1 como aspiracionais — aplicar aos CSS variables `.dark`, sem ajustes por componente. Cores hardcoded como `text-white` no hero já funcionam em ambos os modos. Validação visual do dark mode fica para iteração futura)
+- Page transitions (sem animações de rota/navegação — fora de escopo)
 - Responsividade (manter breakpoints atuais, apenas refinar)
