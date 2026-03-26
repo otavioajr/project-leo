@@ -91,6 +91,8 @@ export default function Home() {
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-tr from-black/70 via-black/30 to-transparent" />
+        {/* Top gradient for header readability */}
+        <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black/50 to-transparent z-[1]" />
         <div className="relative z-10 flex h-full min-h-[85vh] flex-col items-center justify-center text-center text-white p-6">
           <h1 className="text-5xl md:text-7xl font-headline font-extrabold tracking-tight">
             {homePageContent.heroTitle}
