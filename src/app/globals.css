@@ -12,31 +12,32 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 20%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 20%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 20%;
-    --primary: 121 39% 27%;
+    --primary: 145 45% 22%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 16 100% 60%;
+    --secondary: 24 100% 55%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
+    --background: 40 20% 98%;
+    --foreground: 30 10% 15%;
+    --card: 40 20% 98%;
+    --card-foreground: 30 10% 15%;
+    --popover: 40 20% 98%;
+    --popover-foreground: 30 10% 15%;
+    --muted: 40 15% 94%;
+    --muted-foreground: 30 5% 40%;
     --accent: 217 76% 60%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 121 39% 27%;
+    --border: 40 10% 88%;
+    --input: 40 10% 88%;
+    --ring: 145 45% 22%;
+    --radius: 0.75rem;
+    --footer-bg: 145 40% 10%;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -47,25 +48,22 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
   .dark {
-    --background: 120 5% 10%;
-    --foreground: 0 0% 98%;
-    --card: 120 5% 10%;
-    --card-foreground: 0 0% 98%;
-    --popover: 120 5% 10%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 121 40% 50%;
-    --primary-foreground: 120 5% 10%;
-    --secondary: 16 90% 55%;
+    --primary: 145 40% 50%;
+    --primary-foreground: 150 8% 8%;
+    --secondary: 24 90% 50%;
     --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 217 70% 55%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 121 40% 50%;
+    --background: 150 8% 8%;
+    --foreground: 40 10% 95%;
+    --card: 150 8% 8%;
+    --card-foreground: 40 10% 95%;
+    --popover: 150 8% 8%;
+    --popover-foreground: 40 10% 95%;
+    --muted: 150 5% 14%;
+    --muted-foreground: 40 5% 60%;
+    --border: 150 5% 14%;
+    --input: 150 5% 14%;
+    --ring: 145 40% 50%;
+    --footer-bg: 150 10% 5%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -93,10 +91,10 @@
 
 @layer components {
     .content-page h2 {
-        @apply font-headline text-2xl font-bold text-primary mt-8 mb-4;
+        @apply font-headline text-2xl font-bold text-primary mt-10 mb-5 border-l-4 border-secondary pl-4;
     }
     .content-page p {
-        @apply text-lg leading-relaxed text-muted-foreground;
+        @apply text-lg leading-relaxed text-muted-foreground mb-4;
     }
     .content-page ul {
         @apply list-disc list-inside space-y-2 text-lg text-muted-foreground;
@@ -106,5 +104,8 @@
     }
     .content-page strong {
         @apply font-semibold text-foreground;
+    }
+    .content-page img {
+        @apply max-w-full w-full rounded-xl;
     }
 }
