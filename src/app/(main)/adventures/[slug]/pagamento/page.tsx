@@ -188,7 +188,7 @@ export default function PagamentoPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <AlertTriangle className="mx-auto mb-4 h-16 w-16 text-amber-500" />
+            <AlertTriangle className="mx-auto mb-4 h-20 w-20 text-destructive" />
           </CardContent>
           <CardFooter>
             <Button asChild className="w-full">
@@ -211,7 +211,7 @@ export default function PagamentoPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <CheckCircle2 className="mx-auto mb-4 h-16 w-16 text-green-500" />
+            <CheckCircle2 className="mx-auto mb-4 h-20 w-20 text-green-500" />
             <p className="text-muted-foreground">
               Em breve entraremos em contato com mais informacoes sobre o pagamento.
             </p>
@@ -237,7 +237,7 @@ export default function PagamentoPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <Clock className="mx-auto mb-4 h-16 w-16 text-amber-500" />
+            <Clock className="mx-auto mb-4 h-20 w-20 text-amber-500" />
             <p className="text-muted-foreground">
               O administrador ira verificar seu pagamento em breve. Voce recebera uma confirmacao por e-mail.
             </p>
@@ -261,7 +261,7 @@ export default function PagamentoPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Card className="mx-auto max-w-lg">
+      <Card className="mx-auto max-w-lg shadow-xl">
         <CardHeader className="text-center">
           <CardTitle className="font-headline text-2xl text-primary">Complete sua Inscricao</CardTitle>
           <CardDescription>
@@ -271,12 +271,12 @@ export default function PagamentoPage() {
 
         <CardContent className="space-y-6">
           {/* Valor Total */}
-          <div className="rounded-lg bg-muted p-4 text-center">
-            <p className="text-sm text-muted-foreground">Valor Total</p>
-            <p className="text-3xl font-bold text-primary">
+          <div className="rounded-xl bg-gradient-to-r from-primary to-primary/80 p-6 text-center text-white">
+            <p className="text-sm text-white/70">Valor Total</p>
+            <p className="text-3xl font-bold">
               {formatCurrency(registration.total_amount || 0)}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-white/60">
               ({registration.group_size} {registration.group_size === 1 ? "pessoa" : "pessoas"})
             </p>
           </div>
@@ -285,7 +285,7 @@ export default function PagamentoPage() {
           {qrCodeUrl && (
             <div className="flex flex-col items-center">
               <p className="mb-2 text-sm font-medium">Escaneie o QR Code:</p>
-              <div className="rounded-lg border bg-white p-2">
+              <div className="rounded-xl border bg-white p-3 shadow-md">
                 <Image
                   src={qrCodeUrl}
                   alt="QR Code PIX"
@@ -301,8 +301,8 @@ export default function PagamentoPage() {
           <div className="space-y-2">
             <p className="text-sm font-medium">Ou copie o codigo PIX:</p>
             <div className="flex gap-2">
-              <div className="flex-1 overflow-hidden rounded-md border bg-muted p-3">
-                <p className="truncate font-mono text-xs text-muted-foreground">
+              <div className="flex-1 overflow-hidden rounded-lg bg-foreground p-3">
+                <p className="truncate font-mono text-xs text-background">
                   {pixConfig.pixCopiaECola}
                 </p>
               </div>
@@ -331,7 +331,7 @@ export default function PagamentoPage() {
 
         <CardFooter className="flex flex-col gap-4">
           <Button
-            className="w-full"
+            className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground text-lg font-bold rounded-full"
             size="lg"
             onClick={handleConfirmPayment}
             disabled={isConfirming || (!token || token !== registration?.registration_token)}

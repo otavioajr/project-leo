@@ -15,6 +15,8 @@ import { useCollection } from "@/supabase/use-collection";
 import type { ContentPage } from "@/lib/types";
 import { Skeleton } from "../ui/skeleton";
 import { BrandLogo } from "./brand-logo";
+import { useState, useEffect } from "react";
+import { useHeaderTransparent } from "./header-context";
 
 
 const staticLinks = [
@@ -25,6 +27,18 @@ const staticLinks = [
 export function Header() {
   const pathname = usePathname();
   const { data: allPages, isLoading } = useCollection<ContentPage>('pages');
+
+  const { transparent } = useHeaderTransparent();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    if (!transparent) return;
+    const handleScroll = () => setScrolled(window.scrollY > 50);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [transparent]);
+
+  const isTransparent = transparent && !scrolled;
 
   // Filtra e ordena no cliente para evitar problemas de índice composto
   const dynamicPages = allPages
@@ -42,8 +56,12 @@ export function Header() {
       <Link
         href={href}
         className={cn(
-          "transition-colors hover:text-primary",
-          isActive ? "text-primary font-semibold" : "text-muted-foreground"
+          "relative transition-colors duration-200 hover:text-primary",
+          "after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:h-[2px] after:bg-current after:transition-transform after:duration-200 after:ease-out",
+          isActive ? "after:w-full after:scale-x-100" : "after:w-full after:scale-x-0 hover:after:scale-x-100",
+          isActive
+            ? isTransparent ? "text-white font-semibold" : "text-primary font-semibold"
+            : isTransparent ? "text-white/80" : "text-muted-foreground"
         )}
       >
         {label}
@@ -69,12 +87,17 @@ export function Header() {
   );
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className={cn(
+      "sticky top-0 z-50 w-full transition-all duration-500 ease-out",
+      isTransparent
+        ? "bg-transparent border-b border-transparent"
+        : "bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b"
+    )}>
       <div className="container mx-auto flex h-16 items-center px-6">
         <div className="flex-1">
             <Link href="/" className="flex items-center gap-2">
-            <Mountain className="h-6 w-6 text-primary" />
-            <BrandLogo />
+            <Mountain className={cn("h-6 w-6", isTransparent ? "text-white" : "text-primary")} />
+            <BrandLogo variant={isTransparent ? "light" : "default"} />
             </Link>
         </div>
 
@@ -92,7 +115,7 @@ export function Header() {
 
         <div className="flex-1 flex justify-end">
             <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild>
+            <Button variant="ghost" size="icon" asChild className={isTransparent ? "text-white hover:text-white/80 hover:bg-white/10" : ""}>
                 <Link href="/admin">
                 <UserCircle className="h-5 w-5" />
                 <span className="sr-only">Painel Administrativo</span>

@@ -252,7 +252,7 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
         {fields.length > 0 && <Separator />}
 
         {fields.map((participantField, index) => (
-           <div key={participantField.id} className="space-y-4 border p-4 rounded-lg bg-muted/50">
+           <div key={participantField.id} className="space-y-4 border-l-4 border-secondary pl-4 py-4">
              <h3 className="text-lg font-medium">Dados do Participante {index + 2}</h3>
              <FormField
                control={form.control}
@@ -290,7 +290,7 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
            </div>
          ))}
 
-        <Button type="submit" className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground" disabled={isSubmitting}>
+        <Button type="submit" className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground text-lg font-bold rounded-full" disabled={isSubmitting}>
           {isSubmitting ? "Enviando..." : "Inscreva-se Agora"}
         </Button>
       </form>

@@ -44,6 +44,9 @@ export default function AdminLayout({
     if (!isUserLoading && !user) {
       router.replace('/login');
     }
+    if (!isUserLoading && user?.app_metadata?.must_change_password) {
+      router.replace('/alterar-senha');
+    }
   }, [isUserLoading, user, router]);
 
   const handleSignOut = async () => {

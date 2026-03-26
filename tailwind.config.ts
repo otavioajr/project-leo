@@ -11,7 +11,7 @@ export default {
     extend: {
       fontFamily: {
         body: ['"Open Sans"', 'sans-serif'],
-        headline: ['"Montserrat"', 'sans-serif'],
+        headline: ['"Sora"', 'sans-serif'],
         brand: ['"ZCOOL KuaiLe"', 'sans-serif'],
         adventure: ['"Ketimun"', 'sans-serif'],
         code: ['monospace'],
@@ -67,6 +67,7 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+        'footer-bg': 'hsl(var(--footer-bg))',
       },
       borderRadius: {
         lg: 'var(--radius)',
