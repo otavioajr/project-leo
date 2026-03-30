@@ -68,16 +68,27 @@ const participantSchema = z.object({
   name: z.string().min(2, "O nome do participante é obrigatório."),
 }).catchall(z.string());
 
-const registrationSchema = z.object({
-  name: z.string().min(2, "O nome do contato deve ter pelo menos 2 caracteres."),
-  email: z.string().email("Por favor, insira um endereço de e-mail válido."),
-  phone: z.string().min(10, "Por favor, insira um número de telefone válido."),
-  groupSize: z.coerce.number().min(1, "O grupo deve ter pelo menos 1 pessoa."),
-  customData: z.record(customDataValueSchema).optional(),
-  participants: z.array(participantSchema),
-});
+function createRegistrationSchema(remainingSpots: number | null) {
+  let groupSizeSchema = z.coerce.number().int("Use um número inteiro.").min(1, "O grupo deve ter pelo menos 1 pessoa.");
 
-type RegistrationFormValues = z.infer<typeof registrationSchema>;
+  if (remainingSpots !== null) {
+    groupSizeSchema = groupSizeSchema.max(
+      remainingSpots,
+      `Restam apenas ${remainingSpots} ${remainingSpots === 1 ? "vaga" : "vagas"} para esta aventura.`
+    );
+  }
+
+  return z.object({
+    name: z.string().min(2, "O nome do contato deve ter pelo menos 2 caracteres."),
+    email: z.string().email("Por favor, insira um endereço de e-mail válido."),
+    phone: z.string().min(10, "Por favor, insira um número de telefone válido."),
+    groupSize: groupSizeSchema,
+    customData: z.record(customDataValueSchema).optional(),
+    participants: z.array(participantSchema),
+  });
+}
+
+type RegistrationFormValues = z.infer<ReturnType<typeof createRegistrationSchema>>;
 
 type RegistrationFormProps = {
   adventureId: string;
@@ -85,9 +96,10 @@ type RegistrationFormProps = {
   adventureSlug: string;
   adventurePrice: number;
   customFields?: CustomField[];
+  remainingSpots: number | null;
 };
 
-export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, adventurePrice, customFields }: RegistrationFormProps) {
+export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, adventurePrice, customFields, remainingSpots }: RegistrationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const supabase = useSupabase();
@@ -102,7 +114,7 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
   });
 
   const form = useForm<RegistrationFormValues>({
-    resolver: zodResolver(registrationSchema),
+    resolver: zodResolver(createRegistrationSchema(remainingSpots)),
     defaultValues: {
       name: "",
       email: "",
@@ -119,6 +131,12 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
   });
 
   const groupSize = form.watch("groupSize");
+
+  useEffect(() => {
+    if (remainingSpots !== null && remainingSpots > 0 && groupSize > remainingSpots) {
+      form.setValue("groupSize", remainingSpots);
+    }
+  }, [form, groupSize, remainingSpots]);
 
   useEffect(() => {
     const desiredParticipantCount = Math.max(0, groupSize - 1);
@@ -260,8 +278,19 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
             <FormItem>
               <FormLabel>Tamanho do Grupo</FormLabel>
               <FormControl>
-                <Input type="number" min="1" placeholder="1" {...field} />
+                <Input
+                  type="number"
+                  min="1"
+                  max={remainingSpots ?? undefined}
+                  placeholder="1"
+                  {...field}
+                />
               </FormControl>
+              {remainingSpots !== null && (
+                <p className="text-sm text-muted-foreground">
+                  Restam {remainingSpots} {remainingSpots === 1 ? "vaga" : "vagas"} confirmadas disponíveis.
+                </p>
+              )}
               <FormMessage />
             </FormItem>
           )}

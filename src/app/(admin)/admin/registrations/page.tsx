@@ -41,7 +41,7 @@ import { ptBR } from "date-fns/locale";
 import { User, Mail, Phone, Users, LoaderCircle, CheckCircle2, Clock, AlertCircle, DollarSign, MoreHorizontal, Trash2 } from "lucide-react";
 import { useCollection } from "@/supabase/use-collection";
 import { useSupabase } from "@/supabase/hooks";
-import type { Registration, PaymentStatus } from "@/lib/types";
+import type { Adventure, Registration, PaymentStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
 function formatFieldName(name: string) {
@@ -76,10 +76,50 @@ export default function RegistrationsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [registrationToDelete, setRegistrationToDelete] = useState<string | null>(null);
 
-  const handleConfirmPayment = async (registrationId: string) => {
-    setConfirmingId(registrationId);
+  const handleConfirmPayment = async (registration: Registration) => {
+    setConfirmingId(registration.id);
     try {
-      const { error } = await supabase.from('registrations').update({ payment_status: 'confirmed' }).eq('id', registrationId);
+      if (registration.adventure_id) {
+        const { data: adventure, error: adventureError } = await supabase
+          .from('adventures')
+          .select('max_participants')
+          .eq('id', registration.adventure_id)
+          .single();
+
+        if (adventureError) throw adventureError;
+
+        const typedAdventure = adventure as Pick<Adventure, "max_participants">;
+
+        if (typedAdventure.max_participants !== null) {
+          const { data: confirmedRegistrations, error: confirmedError } = await supabase
+            .from('registrations')
+            .select('group_size')
+            .eq('adventure_id', registration.adventure_id)
+            .eq('payment_status', 'confirmed')
+            .neq('id', registration.id);
+
+          if (confirmedError) throw confirmedError;
+
+          const confirmedParticipants = (confirmedRegistrations ?? []).reduce(
+            (sum, item) => sum + item.group_size,
+            0
+          );
+
+          if (confirmedParticipants + registration.group_size > typedAdventure.max_participants) {
+            toast({
+              title: "Limite de vagas excedido",
+              description: "Nao ha vagas suficientes para confirmar esta inscricao.",
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+      }
+
+      const { error } = await supabase
+        .from('registrations')
+        .update({ payment_status: 'confirmed' })
+        .eq('id', registration.id);
       if (error) throw error;
       toast({
         title: "Pagamento Confirmado",
@@ -92,8 +132,9 @@ export default function RegistrationsPage() {
         description: "Nao foi possivel confirmar o pagamento.",
         variant: "destructive",
       });
+    } finally {
+      setConfirmingId(null);
     }
-    setConfirmingId(null);
   };
 
   const handleDeleteRegistration = async () => {
@@ -230,7 +271,7 @@ export default function RegistrationsPage() {
                         <DropdownMenuSeparator />
                         {reg.payment_status !== "confirmed" && (
                           <DropdownMenuItem
-                            onClick={() => handleConfirmPayment(reg.id)}
+                            onClick={() => handleConfirmPayment(reg)}
                             disabled={confirmingId === reg.id}
                           >
                             <CheckCircle2 className="h-4 w-4 mr-2" />

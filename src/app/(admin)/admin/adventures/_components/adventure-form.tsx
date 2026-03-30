@@ -125,6 +125,10 @@ const adventureSchema = z.object({
   title: z.string().min(3, "O titulo deve ter pelo menos 3 caracteres."),
   description: z.string().min(10, "A descricao curta deve ter pelo menos 10 caracteres.").max(150, "A descricao curta deve ter menos de 150 caracteres."),
   longDescription: z.string().min(20, "A descricao longa deve ter pelo menos 20 caracteres."),
+  maxParticipants: z.preprocess(
+    (value) => value === "" ? null : value,
+    z.union([z.coerce.number().int("Use um numero inteiro.").min(1, "O limite deve ser pelo menos 1."), z.null()])
+  ),
   price: z.coerce.number().min(0, "O preco deve ser um numero positivo."),
   duration: z.string().min(1, "A duracao e obrigatoria."),
   location: z.string().min(1, "A localizacao e obrigatoria."),
@@ -165,6 +169,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       title: adventure?.title || "",
       description: adventure?.description || "",
       longDescription: adventure?.long_description || "",
+      maxParticipants: adventure?.max_participants ?? null,
       price: adventure?.price || 0,
       duration: adventure?.duration || "",
       location: adventure?.location || "",
@@ -249,6 +254,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       title: values.title,
       description: values.description,
       long_description: values.longDescription,
+      max_participants: values.maxParticipants,
       price: values.price,
       duration: values.duration,
       location: values.location,
@@ -389,6 +395,28 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
             />
           </div>
           <div className="space-y-8">
+            <FormField
+              control={form.control}
+              name="maxParticipants"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Limite Máximo de Pessoas</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="Deixe em branco para ilimitado"
+                      value={field.value ?? ""}
+                      onChange={(event) => field.onChange(event.target.value)}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Define quantas pessoas, no total, podem participar desta aventura.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="price"

@@ -3,7 +3,7 @@
 import { notFound, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Timer, BarChart, MapPin, Info } from 'lucide-react';
+import { DollarSign, Timer, BarChart, MapPin, Info, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RegistrationForm } from './_components/registration-form';
 import { useSupabase } from '@/supabase/hooks';
@@ -15,6 +15,7 @@ import { useHeaderTransparent } from '@/components/layout/header-context';
 function useFetchAdventure(slug: string) {
   const supabase = useSupabase();
   const [adventure, setAdventure] = useState<Adventure | null>(null);
+  const [confirmedParticipants, setConfirmedParticipants] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -31,20 +32,33 @@ function useFetchAdventure(slug: string) {
       .select()
       .eq('slug', slug)
       .single()
-      .then(({ data, error }) => {
-        if (error) setError(new Error(error.message));
-        else setAdventure(data as Adventure);
+      .then(async ({ data, error }) => {
+        if (error) {
+          setError(new Error(error.message));
+        } else {
+          const typedAdventure = data as Adventure;
+          setAdventure(typedAdventure);
+
+          const { data: confirmedCount, error: confirmedError } = await supabase
+            .rpc('get_adventure_confirmed_participants', { p_adventure_id: typedAdventure.id });
+
+          if (confirmedError) {
+            setError(new Error(confirmedError.message));
+          } else {
+            setConfirmedParticipants(confirmedCount ?? 0);
+          }
+        }
         setIsLoading(false);
       });
   }, [supabase, slug]);
 
-  return { adventure, isLoading, error };
+  return { adventure, confirmedParticipants, isLoading, error };
 }
 
 export default function AdventurePage() {
   const params = useParams();
   const slug = params.slug as string;
-  const { adventure, isLoading, error } = useFetchAdventure(slug);
+  const { adventure, confirmedParticipants, isLoading, error } = useFetchAdventure(slug);
   const { setTransparent } = useHeaderTransparent();
 
   useEffect(() => {
@@ -92,6 +106,10 @@ export default function AdventurePage() {
     'Moderado': 'secondary',
     'Desafiador': 'destructive',
   } as const;
+  const remainingSpots = adventure.max_participants === null
+    ? null
+    : Math.max(adventure.max_participants - confirmedParticipants, 0);
+  const isSoldOut = remainingSpots !== null && remainingSpots <= 0;
 
   return (
     <div>
@@ -123,8 +141,25 @@ export default function AdventurePage() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
           <div className="lg:col-span-3">
             <p className="text-lg leading-relaxed text-muted-foreground mb-6">{adventure.description}</p>
+            {remainingSpots !== null && (
+              <div className="mb-6 flex items-center gap-3 rounded-2xl border bg-muted/40 px-4 py-3">
+                <div className="rounded-full bg-primary/10 p-2">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">
+                    {remainingSpots} {remainingSpots === 1 ? "vaga restante" : "vagas restantes"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {confirmedParticipants} de {adventure.max_participants} pessoas ja confirmadas
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="prose max-w-none text-foreground text-lg leading-relaxed">
-              <p>{adventure.long_description}</p>
+              <div className="whitespace-pre-line">
+                {adventure.long_description}
+              </div>
             </div>
           </div>
 
@@ -166,10 +201,20 @@ export default function AdventurePage() {
                       {adventure.difficulty}
                     </Badge>
                   </div>
+                  {remainingSpots !== null && (
+                    <div className="flex items-center gap-3">
+                      <div className="bg-primary/10 rounded-full p-2">
+                        <Users className="h-5 w-5 text-primary" />
+                      </div>
+                      <span>
+                        {remainingSpots} {remainingSpots === 1 ? "vaga restante" : "vagas restantes"}
+                      </span>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
-              {adventure.registrations_enabled ? (
+              {adventure.registrations_enabled && !isSoldOut ? (
                 <Card>
                   <CardHeader>
                     <CardTitle className="font-headline">Reserve Seu Lugar</CardTitle>
@@ -181,7 +226,19 @@ export default function AdventurePage() {
                       adventureSlug={adventure.slug}
                       adventurePrice={adventure.price}
                       customFields={adventure.custom_fields}
+                      remainingSpots={remainingSpots}
                     />
+                  </CardContent>
+                </Card>
+              ) : isSoldOut ? (
+                <Card className="bg-muted">
+                  <CardHeader>
+                    <CardTitle className="font-headline text-muted-foreground">Aventura Lotada</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground">
+                      Todas as vagas confirmadas foram preenchidas. Se abrir uma nova vaga, este formulario volta a ficar disponivel.
+                    </p>
                   </CardContent>
                 </Card>
               ) : (

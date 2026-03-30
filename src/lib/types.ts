@@ -16,6 +16,7 @@ export type Adventure = {
   title: string;
   description: string;
   long_description: string;
+  max_participants: number | null;
   price: number;
   duration: string;
   location: string;
