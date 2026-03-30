@@ -46,12 +46,12 @@ export default function EditAdventurePage() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Editar Aventura</CardTitle>
-        <CardDescription>
-          Atualize os detalhes para "{adventure.title}".
-        </CardDescription>
-      </CardHeader>
+        <CardHeader>
+          <CardTitle>Editar Aventura</CardTitle>
+          <CardDescription>
+          Atualize os detalhes para &quot;{adventure.title}&quot;.
+          </CardDescription>
+        </CardHeader>
       <CardContent>
         <AdventureForm adventure={adventure} />
       </CardContent>
