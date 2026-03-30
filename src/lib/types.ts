@@ -1,9 +1,14 @@
 export type CustomField = {
   name: string;
   label: string;
-  type: 'text' | 'email' | 'tel' | 'number';
+  type: 'text' | 'email' | 'tel' | 'number' | 'select' | 'multiselect';
   required: boolean;
+  options?: string[];
 };
+
+export type RegistrationCustomValue = string | string[];
+
+export type RegistrationCustomData = Record<string, RegistrationCustomValue>;
 
 export type Adventure = {
   id: string;
@@ -35,7 +40,7 @@ export type Registration = {
     payment_status?: PaymentStatus;
     total_amount?: number;
     registration_token?: string;
-    custom_data?: Record<string, string>;
+    custom_data?: RegistrationCustomData;
 };
 
 export type HomePageContent = {
