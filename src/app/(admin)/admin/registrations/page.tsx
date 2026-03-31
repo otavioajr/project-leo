@@ -36,12 +36,19 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { User, Mail, Phone, Users, LoaderCircle, CheckCircle2, Clock, AlertCircle, DollarSign, MoreHorizontal, Trash2 } from "lucide-react";
 import { useCollection } from "@/supabase/use-collection";
 import { useSupabase } from "@/supabase/hooks";
-import type { Registration, PaymentStatus } from "@/lib/types";
+import type { Adventure, Registration, PaymentStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
 function formatFieldName(name: string) {
@@ -70,11 +77,19 @@ const defaultStatusConfig = {
 
 export default function RegistrationsPage() {
   const { data: registrations, isLoading } = useCollection<Registration>('registrations');
+  const { data: adventures, isLoading: isLoadingAdventures } = useCollection<Adventure>("adventures");
   const supabase = useSupabase();
   const { toast } = useToast();
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [registrationToDelete, setRegistrationToDelete] = useState<string | null>(null);
+  const [selectedAdventureId, setSelectedAdventureId] = useState<string>("all");
+
+  const filteredRegistrations = selectedAdventureId === "all"
+    ? registrations
+    : registrations?.filter((registration) => registration.adventure_id === selectedAdventureId);
+
+  const hasActiveFilter = selectedAdventureId !== "all";
 
   const handleConfirmPayment = async (registration: Registration) => {
     setConfirmingId(registration.id);
@@ -127,7 +142,7 @@ export default function RegistrationsPage() {
     setDeleteDialogOpen(true);
   };
 
-  if (isLoading) {
+  if (isLoading || isLoadingAdventures) {
       return (
         <div className="flex items-center justify-center p-8">
             <LoaderCircle className="animate-spin" />
@@ -138,10 +153,29 @@ export default function RegistrationsPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Todas as Inscricoes</CardTitle>
-        <CardDescription>
-          Veja todas as inscricoes de usuarios para suas aventuras.
-        </CardDescription>
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-1">
+            <CardTitle>Todas as Inscricoes</CardTitle>
+            <CardDescription>
+              Veja todas as inscricoes de usuarios para suas aventuras.
+            </CardDescription>
+          </div>
+          <div className="w-full md:w-72">
+            <Select value={selectedAdventureId} onValueChange={setSelectedAdventureId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por aventura" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as aventuras</SelectItem>
+                {adventures?.map((adventure) => (
+                  <SelectItem key={adventure.id} value={adventure.id}>
+                    {adventure.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <Table>
@@ -156,8 +190,8 @@ export default function RegistrationsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {registrations && registrations.length > 0 ? (
-              registrations.map((reg) => (
+            {filteredRegistrations && filteredRegistrations.length > 0 ? (
+              filteredRegistrations.map((reg) => (
                 <TableRow key={reg.id}>
                   <TableCell className="font-medium">{reg.adventure_title}</TableCell>
                   <TableCell>
@@ -256,7 +290,9 @@ export default function RegistrationsPage() {
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="text-center">
-                  Nenhuma inscricao encontrada.
+                  {hasActiveFilter
+                    ? "Nenhuma inscricao encontrada para a aventura selecionada."
+                    : "Nenhuma inscricao encontrada."}
                 </TableCell>
               </TableRow>
             )}
