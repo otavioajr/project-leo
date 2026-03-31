@@ -15,50 +15,81 @@ import { useHeaderTransparent } from '@/components/layout/header-context';
 function useFetchAdventure(slug: string) {
   const supabase = useSupabase();
   const [adventure, setAdventure] = useState<Adventure | null>(null);
-  const [confirmedParticipants, setConfirmedParticipants] = useState(0);
+  const [reservedParticipants, setReservedParticipants] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     if (!slug) {
       setAdventure(null);
+      setReservedParticipants(0);
+      setError(null);
       setIsLoading(false);
       return;
     }
 
+    setAdventure(null);
+    setReservedParticipants(0);
+    setError(null);
     setIsLoading(true);
-    supabase
-      .from('adventures')
-      .select()
-      .eq('slug', slug)
-      .single()
-      .then(async ({ data, error }) => {
-        if (error) {
-          setError(new Error(error.message));
-        } else {
-          const typedAdventure = data as Adventure;
-          setAdventure(typedAdventure);
 
-          const { data: confirmedCount, error: confirmedError } = await supabase
-            .rpc('get_adventure_confirmed_participants', { p_adventure_id: typedAdventure.id });
+    async function loadAdventure() {
+      const { data, error: fetchError } = await supabase
+        .from('adventures')
+        .select()
+        .eq('slug', slug)
+        .maybeSingle();
 
-          if (confirmedError) {
-            setError(new Error(confirmedError.message));
-          } else {
-            setConfirmedParticipants(confirmedCount ?? 0);
-          }
-        }
+      if (cancelled) {
+        return;
+      }
+
+      if (fetchError) {
+        setError(new Error(fetchError.message));
         setIsLoading(false);
-      });
+        return;
+      }
+
+      if (!data) {
+        setIsLoading(false);
+        return;
+      }
+
+      const typedAdventure = data as Adventure;
+      setAdventure(typedAdventure);
+
+      const { data: reservedCount, error: reservedError } = await supabase
+        .rpc('get_adventure_reserved_participants', { p_adventure_id: typedAdventure.id });
+
+      if (cancelled) {
+        return;
+      }
+
+      if (reservedError) {
+        setError(new Error(reservedError.message));
+      } else {
+        setReservedParticipants(reservedCount ?? 0);
+      }
+
+      setIsLoading(false);
+    }
+
+    void loadAdventure();
+
+    return () => {
+      cancelled = true;
+    };
   }, [supabase, slug]);
 
-  return { adventure, confirmedParticipants, isLoading, error };
+  return { adventure, reservedParticipants, isLoading, error };
 }
 
 export default function AdventurePage() {
   const params = useParams();
   const slug = params.slug as string;
-  const { adventure, confirmedParticipants, isLoading, error } = useFetchAdventure(slug);
+  const { adventure, reservedParticipants, isLoading, error } = useFetchAdventure(slug);
   const { setTransparent } = useHeaderTransparent();
 
   useEffect(() => {
@@ -108,7 +139,7 @@ export default function AdventurePage() {
   } as const;
   const remainingSpots = adventure.max_participants === null
     ? null
-    : Math.max(adventure.max_participants - confirmedParticipants, 0);
+    : Math.max(adventure.max_participants - reservedParticipants, 0);
   const isSoldOut = remainingSpots !== null && remainingSpots <= 0;
 
   return (
@@ -151,7 +182,7 @@ export default function AdventurePage() {
                     {remainingSpots} {remainingSpots === 1 ? "vaga restante" : "vagas restantes"}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {confirmedParticipants} de {adventure.max_participants} pessoas ja confirmadas
+                    {reservedParticipants} de {adventure.max_participants} vagas reservadas no momento
                   </p>
                 </div>
               </div>
@@ -237,7 +268,7 @@ export default function AdventurePage() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground">
-                      Todas as vagas confirmadas foram preenchidas. Se abrir uma nova vaga, este formulario volta a ficar disponivel.
+                      Todas as vagas disponíveis já foram reservadas. Se uma vaga for liberada, este formulário volta a ficar disponível.
                     </p>
                   </CardContent>
                 </Card>
