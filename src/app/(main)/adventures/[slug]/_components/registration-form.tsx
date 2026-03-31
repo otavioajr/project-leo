@@ -103,6 +103,7 @@ type RegistrationRpcErrorId =
   | "CAPACITY_EXCEEDED"
   | "ADVENTURE_NOT_FOUND"
   | "INVALID_GROUP_SIZE"
+  | "REGISTRATIONS_DISABLED"
   | "UNKNOWN";
 
 function getErrorString(value: unknown) {
@@ -142,6 +143,10 @@ function normalizeRegistrationRpcError(error: unknown): RegistrationRpcErrorId {
 
   if (matchesIdentifier("INVALID_GROUP_SIZE")) {
     return "INVALID_GROUP_SIZE";
+  }
+
+  if (matchesIdentifier("REGISTRATIONS_DISABLED")) {
+    return "REGISTRATIONS_DISABLED";
   }
 
   return "UNKNOWN";
@@ -337,6 +342,15 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
         toast({
           title: "Tamanho de grupo inválido",
           description: "Revise a quantidade de participantes e tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (rpcErrorId === "REGISTRATIONS_DISABLED") {
+        toast({
+          title: "Inscrições encerradas",
+          description: "As inscrições para esta aventura estão fechadas no momento.",
           variant: "destructive",
         });
         return;
