@@ -75,6 +75,8 @@ const defaultStatusConfig = {
   icon: AlertCircle,
 };
 
+const confirmableStatuses = new Set<PaymentStatus>(["pending", "awaiting_confirmation"]);
+
 export default function RegistrationsPage() {
   const { data: registrations, isLoading } = useCollection<Registration>('registrations');
   const { data: adventures, isLoading: isLoadingAdventures } = useCollection<Adventure>("adventures");
@@ -83,15 +85,28 @@ export default function RegistrationsPage() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [registrationToDelete, setRegistrationToDelete] = useState<string | null>(null);
-  const [selectedAdventureId, setSelectedAdventureId] = useState<string>("all");
+  const [selectedAdventureId, setSelectedAdventureId] = useState<string>("");
 
-  const filteredRegistrations = selectedAdventureId === "all"
+  const sortedAdventures = adventures?.slice().sort((firstAdventure, secondAdventure) =>
+    firstAdventure.title.localeCompare(secondAdventure.title, "pt-BR")
+  );
+
+  const filteredRegistrations = selectedAdventureId === ""
     ? registrations
     : registrations?.filter((registration) => registration.adventure_id === selectedAdventureId);
 
-  const hasActiveFilter = selectedAdventureId !== "all";
+  const hasActiveFilter = selectedAdventureId !== "";
 
   const handleConfirmPayment = async (registration: Registration) => {
+    if (!registration.payment_status || !confirmableStatuses.has(registration.payment_status)) {
+      toast({
+        title: "Status inválido",
+        description: "Somente inscrições pendentes podem ter o pagamento confirmado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setConfirmingId(registration.id);
     try {
       const { error } = await supabase
@@ -160,20 +175,30 @@ export default function RegistrationsPage() {
               Veja todas as inscricoes de usuarios para suas aventuras.
             </CardDescription>
           </div>
-          <div className="w-full md:w-72">
-            <Select value={selectedAdventureId} onValueChange={setSelectedAdventureId}>
-              <SelectTrigger>
+          <div className="flex w-full gap-2 md:w-auto">
+            <Select
+              value={selectedAdventureId || undefined}
+              onValueChange={setSelectedAdventureId}
+            >
+              <SelectTrigger className="w-full md:w-72">
                 <SelectValue placeholder="Filtrar por aventura" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas as aventuras</SelectItem>
-                {adventures?.map((adventure) => (
+                {sortedAdventures?.map((adventure) => (
                   <SelectItem key={adventure.id} value={adventure.id}>
                     {adventure.title}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSelectedAdventureId("")}
+              disabled={!hasActiveFilter}
+            >
+              Limpar
+            </Button>
           </div>
         </div>
       </CardHeader>
@@ -266,7 +291,7 @@ export default function RegistrationsPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Acoes</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {reg.payment_status !== "confirmed" && (
+                        {reg.payment_status && confirmableStatuses.has(reg.payment_status) && (
                           <DropdownMenuItem
                             onClick={() => handleConfirmPayment(reg)}
                             disabled={confirmingId === reg.id}
