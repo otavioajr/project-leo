@@ -99,6 +99,7 @@ export default function RegistrationsPage() {
   const hasActiveFilter = selectedAdventureId !== "";
   const selectedAdventure = sortedAdventures?.find((adventure) => adventure.id === selectedAdventureId);
   const hasFilteredRegistrations = (filteredRegistrations?.length ?? 0) > 0;
+  const hasAnyRegistrations = (registrations?.length ?? 0) > 0;
 
   const handleConfirmPayment = async (registration: Registration) => {
     if (!registration.payment_status || !confirmableStatuses.has(registration.payment_status)) {
@@ -375,9 +376,11 @@ export default function RegistrationsPage() {
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="text-center">
-                  {hasActiveFilter
-                    ? "Nenhuma inscricao encontrada para a aventura selecionada. Ajuste o filtro ou escolha outra aventura para exportar."
-                    : "Selecione uma aventura para visualizar e exportar as inscricoes em XLSX."}
+                  {!hasAnyRegistrations
+                    ? "Nenhuma inscricao foi recebida ainda."
+                    : !hasActiveFilter
+                      ? "Selecione uma aventura para visualizar e exportar as inscricoes em XLSX."
+                      : "Nenhuma inscricao encontrada para a aventura selecionada. Ajuste o filtro ou escolha outra aventura para exportar."}
                 </TableCell>
               </TableRow>
             )}
