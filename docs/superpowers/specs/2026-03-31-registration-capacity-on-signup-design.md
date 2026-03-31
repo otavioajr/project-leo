@@ -86,7 +86,7 @@ Manter a lógica só no frontend também foi descartado, porque não resolve con
 
 ### Função de contagem de vagas ocupadas
 
-A função atual [`supabase/migrations/005_add_adventure_capacity.sql`](/Users/otavioajr/Documents/Projetos/project-leo/supabase/migrations/005_add_adventure_capacity.sql) soma apenas inscrições `confirmed`.
+A função atual, criada em [`supabase/migrations/005_add_adventure_capacity.sql`](/Users/otavioajr/Documents/Projetos/project-leo/supabase/migrations/005_add_adventure_capacity.sql), soma apenas inscrições `confirmed`.
 
 Ela deve ser substituída por uma função que some todas as inscrições ainda existentes da aventura:
 
@@ -95,6 +95,8 @@ SELECT COALESCE(SUM(group_size), 0)::integer
 FROM registrations
 WHERE adventure_id = p_adventure_id;
 ```
+
+Uma nova migration deve atualizar ou recriar essa função. Não faz parte desta entrega editar migrations já aplicadas.
 
 O nome da função pode permanecer o mesmo por compatibilidade, mas a semântica deixa de ser "confirmed participants". Se o nome atual começar a gerar ambiguidade no código, vale renomear também os consumidores para refletir "reserved participants" ou "occupied spots".
 
@@ -107,6 +109,19 @@ A criação deve sair do `insert` direto do cliente e passar por uma função SQ
 3. compara `reserved + new_group_size` com `max_participants`
 4. lança erro se ultrapassar o limite
 5. insere a inscrição e retorna a linha criada
+
+### Autorização da RPC
+
+Como a criação atual acontece por `INSERT` público controlado por policy, a nova RPC precisa preservar esse comportamento para usuários não autenticados.
+
+O plano deve assumir uma RPC `SECURITY DEFINER` com validações explícitas para:
+
+- aceitar apenas os campos esperados da inscrição
+- validar a existência da aventura
+- aplicar a regra de lotação antes do insert
+- retornar apenas a linha recém-criada
+
+Isso evita depender de permissões de `INSERT` diretas no cliente para a nova regra transacional.
 
 ### Concorrência
 
@@ -182,6 +197,8 @@ Casos esperados:
 
 Na experiência do usuário final, o erro mais importante é o de lotação concorrente. A mensagem precisa explicar que as vagas se esgotaram enquanto a inscrição era enviada.
 
+Para reduzir acoplamento frágil no frontend, a implementação deve definir um contrato estável para o erro de lotação, preferencialmente por código ou mensagem canônica previsível da RPC.
+
 ---
 
 ## Compatibilidade
@@ -203,7 +220,6 @@ Esse efeito retroativo precisa ser aceito: aventuras com inscrições pendentes 
 
 ## Arquivos afetados
 
-- [`supabase/migrations/005_add_adventure_capacity.sql`](/Users/otavioajr/Documents/Projetos/project-leo/supabase/migrations/005_add_adventure_capacity.sql)
 - nova migration em [`supabase/migrations/`](/Users/otavioajr/Documents/Projetos/project-leo/supabase/migrations/)
 - [`src/app/(main)/adventures/[slug]/page.tsx`](/Users/otavioajr/Documents/Projetos/project-leo/src/app/(main)/adventures/[slug]/page.tsx)
 - [`src/app/(main)/adventures/[slug]/_components/registration-form.tsx`](/Users/otavioajr/Documents/Projetos/project-leo/src/app/(main)/adventures/[slug]/_components/registration-form.tsx)
