@@ -50,6 +50,7 @@ import { useCollection } from "@/supabase/use-collection";
 import { useSupabase } from "@/supabase/hooks";
 import type { Adventure, Registration, PaymentStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { exportRegistrationsToXlsx } from "./_lib/export-registrations";
 
 function formatFieldName(name: string) {
     const words = name.replace(/_/g, ' ').split(' ');
@@ -96,6 +97,8 @@ export default function RegistrationsPage() {
     : registrations?.filter((registration) => registration.adventure_id === selectedAdventureId);
 
   const hasActiveFilter = selectedAdventureId !== "";
+  const selectedAdventure = sortedAdventures?.find((adventure) => adventure.id === selectedAdventureId);
+  const hasFilteredRegistrations = (filteredRegistrations?.length ?? 0) > 0;
 
   const handleConfirmPayment = async (registration: Registration) => {
     if (!registration.payment_status || !confirmableStatuses.has(registration.payment_status)) {
@@ -157,6 +160,56 @@ export default function RegistrationsPage() {
     setDeleteDialogOpen(true);
   };
 
+  const handleExportXlsx = async () => {
+    if (!selectedAdventureId) {
+      toast({
+        title: "Selecione uma aventura",
+        description: "Escolha uma aventura para exportar as inscricoes em XLSX.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!hasFilteredRegistrations || !filteredRegistrations) {
+      toast({
+        title: "Nada para exportar",
+        description: "Nao ha inscricoes no filtro atual para exportacao.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const adventureTitle = selectedAdventure?.title?.trim();
+
+    if (!adventureTitle) {
+      toast({
+        title: "Aventura nao encontrada",
+        description: "Nao foi possivel identificar o titulo da aventura selecionada.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await exportRegistrationsToXlsx({
+        adventureTitle,
+        registrations: filteredRegistrations,
+      });
+
+      toast({
+        title: "Exportacao concluida",
+        description: `Arquivo XLSX gerado para ${adventureTitle}.`,
+      });
+    } catch (error) {
+      console.error("Failed to export registrations:", error);
+      toast({
+        title: "Erro ao exportar",
+        description: "Nao foi possivel gerar o arquivo XLSX das inscricoes.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoading || isLoadingAdventures) {
       return (
         <div className="flex items-center justify-center p-8">
@@ -175,7 +228,7 @@ export default function RegistrationsPage() {
               Veja todas as inscricoes de usuarios para suas aventuras.
             </CardDescription>
           </div>
-          <div className="flex w-full gap-2 md:w-auto">
+          <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
             <Select
               value={selectedAdventureId || undefined}
               onValueChange={setSelectedAdventureId}
@@ -191,6 +244,13 @@ export default function RegistrationsPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              type="button"
+              onClick={handleExportXlsx}
+              disabled={!hasActiveFilter || !hasFilteredRegistrations}
+            >
+              Exportar XLSX
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -316,8 +376,8 @@ export default function RegistrationsPage() {
               <TableRow>
                 <TableCell colSpan={6} className="text-center">
                   {hasActiveFilter
-                    ? "Nenhuma inscricao encontrada para a aventura selecionada."
-                    : "Nenhuma inscricao encontrada."}
+                    ? "Nenhuma inscricao encontrada para a aventura selecionada. Ajuste o filtro ou escolha outra aventura para exportar."
+                    : "Selecione uma aventura para visualizar e exportar as inscricoes em XLSX."}
                 </TableCell>
               </TableRow>
             )}
