@@ -99,7 +99,55 @@ type RegistrationFormProps = {
   remainingSpots: number | null;
 };
 
-export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, adventurePrice, customFields, remainingSpots }: RegistrationFormProps) {
+type RegistrationRpcErrorId =
+  | "CAPACITY_EXCEEDED"
+  | "ADVENTURE_NOT_FOUND"
+  | "INVALID_GROUP_SIZE"
+  | "UNKNOWN";
+
+function getErrorString(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function normalizeRegistrationRpcError(error: unknown): RegistrationRpcErrorId {
+  if (typeof error !== "object" || error === null) {
+    return "UNKNOWN";
+  }
+
+  const message = getErrorString("message" in error ? error.message : undefined);
+  const details = getErrorString("details" in error ? error.details : undefined);
+  const hint = getErrorString("hint" in error ? error.hint : undefined);
+  const code = getErrorString("code" in error ? error.code : undefined);
+
+  const normalizedParts = [message, details, hint, code]
+    .map((part) => part.trim().toUpperCase())
+    .filter(Boolean);
+
+  const matchesIdentifier = (identifier: RegistrationRpcErrorId) =>
+    normalizedParts.some(
+      (part) =>
+        part === identifier ||
+        part.includes(identifier) ||
+        part.includes(`MESSAGE = '${identifier}'`) ||
+        part.includes(`MESSAGE = "${identifier}"`)
+    );
+
+  if (matchesIdentifier("CAPACITY_EXCEEDED")) {
+    return "CAPACITY_EXCEEDED";
+  }
+
+  if (matchesIdentifier("ADVENTURE_NOT_FOUND")) {
+    return "ADVENTURE_NOT_FOUND";
+  }
+
+  if (matchesIdentifier("INVALID_GROUP_SIZE")) {
+    return "INVALID_GROUP_SIZE";
+  }
+
+  return "UNKNOWN";
+}
+
+export function RegistrationForm({ adventureId, adventureSlug, customFields, remainingSpots }: RegistrationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const supabase = useSupabase();
@@ -204,8 +252,9 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
       return;
     }
 
+    let shouldResetSubmitting = true;
+
     try {
-      const totalAmount = adventurePrice * values.groupSize;
       const customDataPayload: RegistrationCustomData = {};
       allCustomFields.forEach((field) => {
         const customValue = values.customData?.[field.name];
@@ -236,35 +285,72 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
         }
       );
 
-      const { data, error } = await supabase
-        .from("registrations")
-        .insert({
-          adventure_id: adventureId,
-          adventure_title: adventureTitle,
-          name: values.name,
-          email: values.email,
-          phone: values.phone,
-          group_size: values.groupSize,
-          participants: participantsPayload,
-          custom_data: customDataPayload,
-          payment_status: "pending",
-          total_amount: totalAmount,
-          // registration_date and registration_token have DEFAULT values in PostgreSQL
-        })
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc(
+        "create_registration_with_capacity",
+        {
+          p_adventure_id: adventureId,
+          p_name: values.name,
+          p_email: values.email,
+          p_phone: values.phone,
+          p_group_size: values.groupSize,
+          p_participants: participantsPayload,
+          p_custom_data: customDataPayload,
+        }
+      );
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      router.push(`/adventures/${adventureSlug}/pagamento?registrationId=${data.id}&token=${data.registration_token}`);
+      if (!data?.id || !data.registration_token) {
+        throw new Error("INVALID_RPC_RESPONSE");
+      }
+
+      shouldResetSubmitting = false;
+      router.push(
+        `/adventures/${adventureSlug}/pagamento?registrationId=${data.id}&token=${data.registration_token}`
+      );
     } catch (error) {
       console.error("Registration failed:", error);
+
+      const rpcErrorId = normalizeRegistrationRpcError(error);
+
+      if (rpcErrorId === "CAPACITY_EXCEEDED") {
+        toast({
+          title: "Vagas esgotadas",
+          description: "As vagas se esgotaram enquanto enviávamos sua inscrição.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (rpcErrorId === "ADVENTURE_NOT_FOUND") {
+        toast({
+          title: "Aventura indisponível",
+          description: "Esta aventura não está disponível no momento. Tente novamente mais tarde.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (rpcErrorId === "INVALID_GROUP_SIZE") {
+        toast({
+          title: "Tamanho de grupo inválido",
+          description: "Revise a quantidade de participantes e tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({
         title: "Falha na Inscrição",
         description: "Algo deu errado. Por favor, tente novamente.",
         variant: "destructive",
       });
-      setIsSubmitting(false);
+    } finally {
+      if (shouldResetSubmitting) {
+        setIsSubmitting(false);
+      }
     }
   }
 
@@ -288,7 +374,7 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
               </FormControl>
               {remainingSpots !== null && (
                 <p className="text-sm text-muted-foreground">
-                  Restam {remainingSpots} {remainingSpots === 1 ? "vaga" : "vagas"} confirmadas disponíveis.
+                  Restam {remainingSpots} {remainingSpots === 1 ? "vaga" : "vagas"} reservadas no momento.
                 </p>
               )}
               <FormMessage />
@@ -306,7 +392,7 @@ export function RegistrationForm({ adventureId, adventureTitle, adventureSlug, a
             <FormItem>
               <FormLabel>Nome Completo</FormLabel>
               <FormControl>
-                <Input placeholder="João Ninguém" {...field} />
+                <Input placeholder="Nome Completo" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
