@@ -5,7 +5,6 @@ import type { Registration, RegistrationCustomValue } from "@/lib/types";
 type ExportCellValue = string | number | boolean | Date | null | undefined;
 
 type ExportRowKind = "Titular" | "Participante";
-type ExportCustomColumnSource = "custom_data" | "participant";
 
 export type ExportRegistrationsInput = {
   adventureTitle: string;
@@ -15,7 +14,6 @@ export type ExportRegistrationsInput = {
 export type ExportRegistrationsCustomColumn = {
   key: string;
   label: string;
-  source: ExportCustomColumnSource;
 };
 
 export type ExportRegistrationRow = {
@@ -117,44 +115,42 @@ function createEmptyCustomValues(
 function collectStableCustomColumns(
   registrations: Registration[]
 ): ExportRegistrationsCustomColumn[] {
-  const customDataColumns = new Map<string, ExportRegistrationsCustomColumn>();
-  const participantColumns = new Map<string, ExportRegistrationsCustomColumn>();
+  const customColumns = new Map<string, ExportRegistrationsCustomColumn>();
 
   for (const registration of registrations) {
     for (const key of Object.keys(registration.custom_data ?? {})) {
-      if (key === "name" || customDataColumns.has(key)) {
+      if (key === "name" || customColumns.has(key)) {
         continue;
       }
 
-      customDataColumns.set(key, {
+      customColumns.set(key, {
         key,
         label: formatFieldLabel(key),
-        source: "custom_data",
       });
     }
 
     for (const participant of registration.participants ?? []) {
       for (const key of Object.keys(participant)) {
-        if (key === "name" || participantColumns.has(key)) {
+        if (key === "name" || customColumns.has(key)) {
           continue;
         }
 
-        participantColumns.set(key, {
+        customColumns.set(key, {
           key,
           label: formatFieldLabel(key),
-          source: "participant",
         });
       }
     }
   }
 
-  return [...customDataColumns.values(), ...participantColumns.values()];
+  return [...customColumns.values()].sort((left, right) =>
+    left.key.localeCompare(right.key, "pt-BR", { sensitivity: "base" })
+  );
 }
 
 function mapCustomValues(
   customColumns: ExportRegistrationsCustomColumn[],
-  values: Record<string, RegistrationCustomValue> | Record<string, string> | undefined,
-  source: ExportCustomColumnSource
+  values: Record<string, RegistrationCustomValue> | Record<string, string> | undefined
 ) {
   const customValues = createEmptyCustomValues(customColumns);
 
@@ -163,10 +159,6 @@ function mapCustomValues(
   }
 
   for (const column of customColumns) {
-    if (column.source !== source) {
-      continue;
-    }
-
     customValues[column.key] = normalizeTextCellValue(values[column.key]);
   }
 
@@ -196,11 +188,7 @@ function flattenRegistration(
       rowKind: "Titular",
       groupPosition: 1,
       personName: registration.name,
-      customValues: mapCustomValues(
-        customColumns,
-        registration.custom_data,
-        "custom_data"
-      ),
+      customValues: mapCustomValues(customColumns, registration.custom_data),
     },
   ];
 
@@ -210,7 +198,7 @@ function flattenRegistration(
       rowKind: "Participante",
       groupPosition: index + 2,
       personName: normalizeTextCellValue(participant.name),
-      customValues: mapCustomValues(customColumns, participant, "participant"),
+      customValues: mapCustomValues(customColumns, participant),
     });
   }
 
