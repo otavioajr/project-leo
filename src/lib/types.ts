@@ -74,8 +74,17 @@ export type AdminRole = {
   isAdmin: boolean;
 };
 
+export type PixGroupSize = 1 | 2 | 3 | 4;
+
+export type PixCopiaEColaByGroupSize = {
+  1: string;
+  2: string;
+  3: string;
+  4: string;
+};
+
 export type PixConfig = {
-  pixCopiaECola: string;
+  pixCopiaECola: PixCopiaEColaByGroupSize;
   pixEnabled: boolean;
   instructions?: string;
 };

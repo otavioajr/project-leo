@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { LoaderCircle, Copy, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 import type { Registration, PixConfig } from "@/lib/types";
+import { normalizePixConfig } from "@/lib/pix-config";
 import QRCode from "qrcode";
 import Image from "next/image";
 import Link from "next/link";
@@ -55,16 +56,31 @@ export default function PagamentoPage() {
       .select('data')
       .eq('id', 'pix')
       .single()
-      .then(({ data, error }) => {
-        if (data) setPixConfig(data.data as PixConfig);
+      .then(({ data }) => {
+        setPixConfig(normalizePixConfig(data?.data));
         setIsLoadingPixConfig(false);
       });
   }, [supabase]);
 
-  // Generate QR Code when PIX config is loaded
+  // Check if already confirmed
   useEffect(() => {
-    if (pixConfig?.pixCopiaECola) {
-      QRCode.toDataURL(pixConfig.pixCopiaECola, {
+    if (registration?.payment_status === "awaiting_confirmation" || registration?.payment_status === "confirmed") {
+      setPaymentConfirmed(true);
+    }
+  }, [registration]);
+
+  const groupSizeSlot =
+    registration && registration.group_size >= 1 && registration.group_size <= 4
+      ? (registration.group_size as 1 | 2 | 3 | 4)
+      : null;
+
+  const pixCopiaECola =
+    pixConfig && groupSizeSlot ? pixConfig.pixCopiaECola[groupSizeSlot] : "";
+
+  // Generate QR Code when PIX copia-e-cola changes
+  useEffect(() => {
+    if (pixCopiaECola) {
+      QRCode.toDataURL(pixCopiaECola, {
         width: 300,
         margin: 2,
         color: {
@@ -74,20 +90,15 @@ export default function PagamentoPage() {
       })
         .then((url) => setQrCodeUrl(url))
         .catch((err) => console.error("Failed to generate QR Code:", err));
+    } else {
+      setQrCodeUrl(null);
     }
-  }, [pixConfig]);
-
-  // Check if already confirmed
-  useEffect(() => {
-    if (registration?.payment_status === "awaiting_confirmation" || registration?.payment_status === "confirmed") {
-      setPaymentConfirmed(true);
-    }
-  }, [registration]);
+  }, [pixCopiaECola]);
 
   const handleCopyPix = async () => {
-    if (pixConfig?.pixCopiaECola) {
+    if (pixCopiaECola) {
       try {
-        await navigator.clipboard.writeText(pixConfig.pixCopiaECola);
+        await navigator.clipboard.writeText(pixCopiaECola);
         setCopied(true);
         toast({
           title: "Copiado!",
@@ -200,7 +211,7 @@ export default function PagamentoPage() {
     );
   }
 
-  if (!pixConfig?.pixEnabled || !pixConfig?.pixCopiaECola) {
+  if (!pixConfig?.pixEnabled) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card className="mx-auto max-w-md">
@@ -219,6 +230,31 @@ export default function PagamentoPage() {
           <CardFooter className="justify-center">
             <Button asChild>
               <Link href="/">Voltar para Home</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!pixCopiaECola) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="mx-auto max-w-md">
+          <CardHeader>
+            <CardTitle className="text-destructive">PIX Indisponível</CardTitle>
+            <CardDescription>
+              Não há chave PIX cadastrada para um grupo de {registration.group_size}{" "}
+              {registration.group_size === 1 ? "pessoa" : "pessoas"}. Entre em contato
+              com o organizador para concluir o pagamento.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <AlertTriangle className="mx-auto mb-4 h-20 w-20 text-destructive" />
+          </CardContent>
+          <CardFooter>
+            <Button asChild className="w-full">
+              <Link href={`/adventures/${slug}`}>Voltar para Aventura</Link>
             </Button>
           </CardFooter>
         </Card>
@@ -303,7 +339,7 @@ export default function PagamentoPage() {
             <div className="flex gap-2">
               <div className="flex-1 overflow-hidden rounded-lg bg-foreground p-3">
                 <p className="truncate font-mono text-xs text-background">
-                  {pixConfig.pixCopiaECola}
+                  {pixCopiaECola}
                 </p>
               </div>
               <Button

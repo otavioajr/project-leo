@@ -68,8 +68,14 @@ const participantSchema = z.object({
   name: z.string().min(2, "O nome do participante é obrigatório."),
 }).catchall(z.string());
 
+const PIX_MAX_GROUP_SIZE = 4;
+
 function createRegistrationSchema(remainingSpots: number | null) {
-  let groupSizeSchema = z.coerce.number().int("Use um número inteiro.").min(1, "O grupo deve ter pelo menos 1 pessoa.");
+  let groupSizeSchema = z
+    .coerce.number()
+    .int("Use um número inteiro.")
+    .min(1, "O grupo deve ter pelo menos 1 pessoa.")
+    .max(PIX_MAX_GROUP_SIZE, `O grupo pode ter no máximo ${PIX_MAX_GROUP_SIZE} pessoas.`);
 
   if (remainingSpots !== null) {
     groupSizeSchema = groupSizeSchema.max(
