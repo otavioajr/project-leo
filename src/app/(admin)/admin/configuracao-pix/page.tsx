@@ -3,20 +3,12 @@
 import { PixConfigForm } from "./_components/pix-config-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { useDoc } from "@/supabase/use-doc";
-import type { PixConfig } from "@/lib/types";
 import { LoaderCircle } from "lucide-react";
+import { normalizePixConfig } from "@/lib/pix-config";
 
 export default function ConfiguracaoPixPage() {
-  const { data: configDoc, isLoading } = useDoc<{ data: PixConfig }>('content', 'pix');
-  const config = configDoc?.data ?? null;
-
-  const defaultConfig: PixConfig = {
-    pixCopiaECola: '',
-    pixEnabled: false,
-    instructions: '',
-  };
-
-  const currentConfig = config || defaultConfig;
+  const { data: configDoc, isLoading } = useDoc<{ data: unknown }>('content', 'pix');
+  const currentConfig = normalizePixConfig(configDoc?.data);
 
   return (
     <Card>
