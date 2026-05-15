@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import type {
+  BateriaAvailability,
   CustomField,
   RegistrationCustomData,
   RegistrationCustomValue,
@@ -64,12 +65,18 @@ function isRequiredCustomValueFilled(
   return typeof value === "string" && value.trim() !== "";
 }
 
-const participantSchema = z.object({
-  name: z.string().min(2, "O nome do participante é obrigatório."),
-}).catchall(z.string());
+const participantSchema = z
+  .object({
+    name: z.string().min(2, "O nome do participante é obrigatório."),
+    bateriaId: z.string().optional(),
+  })
+  .catchall(z.string());
 
-function createRegistrationSchema(remainingSpots: number | null) {
-  let groupSizeSchema = z.coerce.number().int("Use um número inteiro.").min(1, "O grupo deve ter pelo menos 1 pessoa.");
+function createRegistrationSchema(remainingSpots: number | null, hasBaterias: boolean) {
+  let groupSizeSchema = z
+    .coerce.number()
+    .int("Use um número inteiro.")
+    .min(1, "O grupo deve ter pelo menos 1 pessoa.");
 
   if (remainingSpots !== null) {
     groupSizeSchema = groupSizeSchema.max(
@@ -78,14 +85,35 @@ function createRegistrationSchema(remainingSpots: number | null) {
     );
   }
 
-  return z.object({
-    name: z.string().min(2, "O nome do contato deve ter pelo menos 2 caracteres."),
-    email: z.string().email("Por favor, insira um endereço de e-mail válido."),
-    phone: z.string().min(10, "Por favor, insira um número de telefone válido."),
-    groupSize: groupSizeSchema,
-    customData: z.record(customDataValueSchema).optional(),
-    participants: z.array(participantSchema),
-  });
+  return z
+    .object({
+      name: z.string().min(2, "O nome do contato deve ter pelo menos 2 caracteres."),
+      email: z.string().email("Por favor, insira um endereço de e-mail válido."),
+      phone: z.string().min(10, "Por favor, insira um número de telefone válido."),
+      groupSize: groupSizeSchema,
+      customData: z.record(customDataValueSchema).optional(),
+      participants: z.array(participantSchema),
+      principalBateriaId: z.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (!hasBaterias) return;
+      if (!data.principalBateriaId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Selecione uma bateria.",
+          path: ["principalBateriaId"],
+        });
+      }
+      data.participants.forEach((p, index) => {
+        if (!p.bateriaId) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Selecione uma bateria.",
+            path: ["participants", index, "bateriaId"],
+          });
+        }
+      });
+    });
 }
 
 type RegistrationFormValues = z.infer<ReturnType<typeof createRegistrationSchema>>;
@@ -97,6 +125,7 @@ type RegistrationFormProps = {
   adventurePrice: number;
   customFields?: CustomField[];
   remainingSpots: number | null;
+  baterias: BateriaAvailability[] | null;
 };
 
 type RegistrationRpcErrorId =
@@ -152,11 +181,25 @@ function normalizeRegistrationRpcError(error: unknown): RegistrationRpcErrorId {
   return "UNKNOWN";
 }
 
-export function RegistrationForm({ adventureId, adventureSlug, customFields, remainingSpots }: RegistrationFormProps) {
+export function RegistrationForm({
+  adventureId,
+  adventureSlug,
+  customFields,
+  remainingSpots,
+  baterias,
+}: RegistrationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const supabase = useSupabase();
   const router = useRouter();
+
+  const [bateriasState, setBateriasState] = useState<BateriaAvailability[] | null>(baterias);
+
+  useEffect(() => {
+    setBateriasState(baterias);
+  }, [baterias]);
+
+  const hasBaterias = (bateriasState?.length ?? 0) > 0;
 
   const allCustomFields = customFields ?? [];
   const participantCustomFields = allCustomFields.filter(isSimpleCustomField);
@@ -167,7 +210,7 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
   });
 
   const form = useForm<RegistrationFormValues>({
-    resolver: zodResolver(createRegistrationSchema(remainingSpots)),
+    resolver: zodResolver(createRegistrationSchema(remainingSpots, hasBaterias)),
     defaultValues: {
       name: "",
       email: "",
@@ -175,6 +218,7 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
       groupSize: 1,
       customData: initialCustomData,
       participants: [],
+      principalBateriaId: hasBaterias ? "" : undefined,
     },
   });
 
@@ -199,9 +243,12 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
     );
 
     if (desiredParticipantCount > currentParticipantCount) {
-      const newFields: { name: string; [key: string]: string }[] = [];
+      const newFields: { name: string; bateriaId: string; [key: string]: string }[] = [];
       for (let i = 0; i < desiredParticipantCount - currentParticipantCount; i++) {
-        const newParticipant: { name: string; [key: string]: string } = { name: "" };
+        const newParticipant: { name: string; bateriaId: string; [key: string]: string } = {
+          name: "",
+          bateriaId: "",
+        };
         additionalParticipantFields.forEach((field) => {
           newParticipant[field.name] = "";
         });
@@ -368,9 +415,49 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
     }
   }
 
+  const principalBateriaId = form.watch("principalBateriaId");
+  const watchedParticipants = form.watch("participants");
+
+  function computeAvailableForBateria(bateriaId: string, excludeIndex: number | "principal"): number {
+    if (!bateriasState) return 0;
+    const bateria = bateriasState.find((b) => b.id === bateriaId);
+    if (!bateria) return 0;
+    let allocated = 0;
+    if (excludeIndex !== "principal" && principalBateriaId === bateriaId) {
+      allocated += 1;
+    }
+    watchedParticipants.forEach((p, idx) => {
+      if (idx === excludeIndex) return;
+      if (p.bateriaId === bateriaId) {
+        allocated += 1;
+      }
+    });
+    return bateria.capacity - bateria.reserved - allocated;
+  }
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {hasBaterias && bateriasState && (
+          <div className="rounded-lg border bg-muted/30 p-3">
+            <p className="text-sm font-semibold mb-2">Vagas por Bateria</p>
+            <ul className="space-y-1 text-sm">
+              {bateriasState.map((b) => {
+                const remaining = Math.max(b.capacity - b.reserved, 0);
+                return (
+                  <li key={b.id} className="flex justify-between">
+                    <span>
+                      {b.label} ({b.start_time.slice(0, 5)}-{b.end_time.slice(0, 5)})
+                    </span>
+                    <span className={remaining > 0 ? "text-green-700 font-semibold" : "text-destructive font-semibold"}>
+                      {remaining > 0 ? `${remaining} ${remaining === 1 ? "vaga" : "vagas"}` : "sem vagas"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
         <FormField
           control={form.control}
           name="groupSize"
@@ -438,6 +525,37 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
             </FormItem>
           )}
         />
+        {hasBaterias && bateriasState && (
+          <FormField
+            control={form.control}
+            name="principalBateriaId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Bateria</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma bateria" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {bateriasState.map((b) => {
+                      const available = computeAvailableForBateria(b.id, "principal");
+                      const disabled = available < 1 && field.value !== b.id;
+                      return (
+                        <SelectItem key={b.id} value={b.id} disabled={disabled}>
+                          {b.label} — {b.start_time.slice(0, 5)}-{b.end_time.slice(0, 5)}{" "}
+                          {disabled ? "(sem vagas)" : `(${Math.max(available, 0)} ${available === 1 ? "vaga" : "vagas"})`}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         {allCustomFields.map((customField) => (
           <FormField
             key={customField.name}
@@ -555,6 +673,37 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
                 </FormItem>
               )}
             />
+            {hasBaterias && bateriasState && (
+              <FormField
+                control={form.control}
+                name={`participants.${index}.bateriaId`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bateria</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma bateria" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {bateriasState.map((b) => {
+                          const available = computeAvailableForBateria(b.id, index);
+                          const disabled = available < 1 && field.value !== b.id;
+                          return (
+                            <SelectItem key={b.id} value={b.id} disabled={disabled}>
+                              {b.label} — {b.start_time.slice(0, 5)}-{b.end_time.slice(0, 5)}{" "}
+                              {disabled ? "(sem vagas)" : `(${Math.max(available, 0)} ${available === 1 ? "vaga" : "vagas"})`}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             {participantCustomFields.map((customField) => (
               <FormField
                 key={customField.name}
