@@ -7,7 +7,7 @@ import { DollarSign, Timer, BarChart, MapPin, Info, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RegistrationForm } from './_components/registration-form';
 import { useSupabase } from '@/supabase/hooks';
-import type { Adventure } from '@/lib/types';
+import type { Adventure, BateriaAvailability } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect } from 'react';
 import { useHeaderTransparent } from '@/components/layout/header-context';
@@ -16,6 +16,7 @@ function useFetchAdventure(slug: string) {
   const supabase = useSupabase();
   const [adventure, setAdventure] = useState<Adventure | null>(null);
   const [reservedParticipants, setReservedParticipants] = useState(0);
+  const [baterias, setBaterias] = useState<BateriaAvailability[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -25,6 +26,7 @@ function useFetchAdventure(slug: string) {
     if (!slug) {
       setAdventure(null);
       setReservedParticipants(0);
+      setBaterias(null);
       setError(null);
       setIsLoading(false);
       return;
@@ -32,6 +34,7 @@ function useFetchAdventure(slug: string) {
 
     setAdventure(null);
     setReservedParticipants(0);
+    setBaterias(null);
     setError(null);
     setIsLoading(true);
 
@@ -42,9 +45,7 @@ function useFetchAdventure(slug: string) {
         .eq('slug', slug)
         .maybeSingle();
 
-      if (cancelled) {
-        return;
-      }
+      if (cancelled) return;
 
       if (fetchError) {
         setError(new Error(fetchError.message));
@@ -60,17 +61,26 @@ function useFetchAdventure(slug: string) {
       const typedAdventure = data as Adventure;
       setAdventure(typedAdventure);
 
-      const { data: reservedCount, error: reservedError } = await supabase
-        .rpc('get_adventure_reserved_participants', { p_adventure_id: typedAdventure.id });
-
-      if (cancelled) {
-        return;
-      }
-
-      if (reservedError) {
-        setError(new Error(reservedError.message));
+      if (typedAdventure.has_baterias) {
+        const { data: bateriasData, error: bateriasError } = await supabase
+          .rpc('get_adventure_baterias_with_availability', {
+            p_adventure_id: typedAdventure.id,
+          });
+        if (cancelled) return;
+        if (bateriasError) {
+          setError(new Error(bateriasError.message));
+        } else {
+          setBaterias((bateriasData ?? []) as BateriaAvailability[]);
+        }
       } else {
-        setReservedParticipants(reservedCount ?? 0);
+        const { data: reservedCount, error: reservedError } = await supabase
+          .rpc('get_adventure_reserved_participants', { p_adventure_id: typedAdventure.id });
+        if (cancelled) return;
+        if (reservedError) {
+          setError(new Error(reservedError.message));
+        } else {
+          setReservedParticipants(reservedCount ?? 0);
+        }
       }
 
       setIsLoading(false);
@@ -83,13 +93,13 @@ function useFetchAdventure(slug: string) {
     };
   }, [supabase, slug]);
 
-  return { adventure, reservedParticipants, isLoading, error };
+  return { adventure, reservedParticipants, baterias, isLoading, error };
 }
 
 export default function AdventurePage() {
   const params = useParams();
   const slug = params.slug as string;
-  const { adventure, reservedParticipants, isLoading, error } = useFetchAdventure(slug);
+  const { adventure, reservedParticipants, baterias, isLoading, error } = useFetchAdventure(slug);
   const { setTransparent } = useHeaderTransparent();
 
   useEffect(() => {
@@ -137,9 +147,16 @@ export default function AdventurePage() {
     'Moderado': 'secondary',
     'Desafiador': 'destructive',
   } as const;
-  const remainingSpots = adventure.max_participants === null
-    ? null
-    : Math.max(adventure.max_participants - reservedParticipants, 0);
+  const usesBaterias = adventure.has_baterias === true;
+
+  const remainingSpots = usesBaterias
+    ? (baterias
+        ? baterias.reduce((sum, b) => sum + Math.max(b.capacity - b.reserved, 0), 0)
+        : null)
+    : adventure.max_participants === null
+      ? null
+      : Math.max(adventure.max_participants - reservedParticipants, 0);
+
   const isSoldOut = remainingSpots !== null && remainingSpots <= 0;
 
   return (
@@ -172,7 +189,33 @@ export default function AdventurePage() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
           <div className="lg:col-span-3">
             <p className="text-lg leading-relaxed text-muted-foreground mb-6">{adventure.description}</p>
-            {remainingSpots !== null && (
+            {usesBaterias && baterias && baterias.length > 0 ? (
+              <div className="mb-6 rounded-2xl border bg-muted/40 px-4 py-3">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="rounded-full bg-primary/10 p-2">
+                    <Users className="h-5 w-5 text-primary" />
+                  </div>
+                  <p className="font-semibold text-foreground">Horários disponíveis</p>
+                </div>
+                <ul className="ml-12 space-y-1 text-sm">
+                  {baterias.map((b) => {
+                    const remaining = Math.max(b.capacity - b.reserved, 0);
+                    return (
+                      <li key={b.id} className="flex justify-between">
+                        <span>
+                          {b.label} — {b.start_time.slice(0, 5)}-{b.end_time.slice(0, 5)}
+                        </span>
+                        <span
+                          className={remaining > 0 ? "text-foreground" : "text-destructive"}
+                        >
+                          {remaining > 0 ? `${remaining} vagas` : "esgotada"}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : remainingSpots !== null ? (
               <div className="mb-6 flex items-center gap-3 rounded-2xl border bg-muted/40 px-4 py-3">
                 <div className="rounded-full bg-primary/10 p-2">
                   <Users className="h-5 w-5 text-primary" />
@@ -186,7 +229,7 @@ export default function AdventurePage() {
                   </p>
                 </div>
               </div>
-            )}
+            ) : null}
             <div className="prose max-w-none text-foreground text-lg leading-relaxed">
               <div className="whitespace-pre-line">
                 {adventure.long_description}
@@ -258,6 +301,7 @@ export default function AdventurePage() {
                       adventurePrice={adventure.price}
                       customFields={adventure.custom_fields}
                       remainingSpots={remainingSpots}
+                      baterias={usesBaterias ? baterias : null}
                     />
                   </CardContent>
                 </Card>
