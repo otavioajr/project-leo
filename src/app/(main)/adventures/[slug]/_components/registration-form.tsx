@@ -133,6 +133,9 @@ type RegistrationRpcErrorId =
   | "ADVENTURE_NOT_FOUND"
   | "INVALID_GROUP_SIZE"
   | "REGISTRATIONS_DISABLED"
+  | "BATERIA_ASSIGNMENTS_MISMATCH"
+  | "BATERIA_NOT_FOUND"
+  | "BATERIA_CAPACITY_EXCEEDED"
   | "UNKNOWN";
 
 function getErrorString(value: unknown) {
@@ -178,6 +181,18 @@ function normalizeRegistrationRpcError(error: unknown): RegistrationRpcErrorId {
     return "REGISTRATIONS_DISABLED";
   }
 
+  if (matchesIdentifier("BATERIA_CAPACITY_EXCEEDED")) {
+    return "BATERIA_CAPACITY_EXCEEDED";
+  }
+
+  if (matchesIdentifier("BATERIA_ASSIGNMENTS_MISMATCH")) {
+    return "BATERIA_ASSIGNMENTS_MISMATCH";
+  }
+
+  if (matchesIdentifier("BATERIA_NOT_FOUND")) {
+    return "BATERIA_NOT_FOUND";
+  }
+
   return "UNKNOWN";
 }
 
@@ -200,6 +215,43 @@ export function RegistrationForm({
   }, [baterias]);
 
   const hasBaterias = (bateriasState?.length ?? 0) > 0;
+
+  useEffect(() => {
+    if (!hasBaterias) return;
+    const channel = supabase
+      .channel(`baterias-${adventureId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "adventure_baterias", filter: `adventure_id=eq.${adventureId}` },
+        async () => {
+          const { data, error } = await supabase
+            .rpc("get_adventure_baterias_with_availability", { p_adventure_id: adventureId });
+          if (error) {
+            console.error("Failed to refresh baterias:", error);
+            return;
+          }
+          setBateriasState((data ?? []) as BateriaAvailability[]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "registrations", filter: `adventure_id=eq.${adventureId}` },
+        async () => {
+          const { data, error } = await supabase
+            .rpc("get_adventure_baterias_with_availability", { p_adventure_id: adventureId });
+          if (error) {
+            console.error("Failed to refresh baterias:", error);
+            return;
+          }
+          setBateriasState((data ?? []) as BateriaAvailability[]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [adventureId, hasBaterias, supabase]);
 
   const allCustomFields = customFields ?? [];
   const participantCustomFields = allCustomFields.filter(isSimpleCustomField);
@@ -337,6 +389,13 @@ export function RegistrationForm({
         }
       );
 
+      const bateriaAssignments = hasBaterias
+        ? {
+            principal: values.principalBateriaId,
+            participants: values.participants.map((p) => p.bateriaId ?? ""),
+          }
+        : null;
+
       const { data, error } = await supabase.rpc(
         "create_registration_with_capacity",
         {
@@ -347,6 +406,7 @@ export function RegistrationForm({
           p_group_size: values.groupSize,
           p_participants: participantsPayload,
           p_custom_data: customDataPayload,
+          p_bateria_assignments: bateriaAssignments,
         }
       );
 
@@ -398,6 +458,33 @@ export function RegistrationForm({
         toast({
           title: "Inscrições encerradas",
           description: "As inscrições para esta aventura estão fechadas no momento.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (rpcErrorId === "BATERIA_ASSIGNMENTS_MISMATCH") {
+        toast({
+          title: "Bateria não selecionada",
+          description: "Selecione uma bateria para cada participante.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (rpcErrorId === "BATERIA_NOT_FOUND") {
+        toast({
+          title: "Bateria indisponível",
+          description: "Bateria não encontrada. Recarregue a página e tente de novo.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (rpcErrorId === "BATERIA_CAPACITY_EXCEEDED") {
+        toast({
+          title: "Vagas esgotadas",
+          description: "As vagas dessa bateria se esgotaram. Recarregue e escolha outra.",
           variant: "destructive",
         });
         return;
