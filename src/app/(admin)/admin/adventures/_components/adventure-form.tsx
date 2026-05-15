@@ -190,6 +190,28 @@ type AdventureFormProps = {
   adventure?: Adventure;
 };
 
+function getSaveBateriasErrorMessage(error: unknown): string {
+  const message = typeof (error as { message?: unknown })?.message === "string"
+    ? (error as { message: string }).message
+    : "";
+  if (message.includes("CANNOT_DISABLE_BATERIAS_WITH_REGISTRATIONS")) {
+    return "Não é possível desativar baterias com inscrições ativas. Cancele as inscrições primeiro.";
+  }
+  if (message.includes("CANNOT_ENABLE_BATERIAS_WITH_REGISTRATIONS")) {
+    return "Não é possível ativar baterias com inscrições já existentes. Cancele as inscrições primeiro.";
+  }
+  if (message.includes("BATERIA_HAS_REGISTRATIONS")) {
+    return "Uma das baterias removidas tem inscrições. Cancele as inscrições primeiro.";
+  }
+  if (message.includes("NOT_AUTHORIZED")) {
+    return "Sem permissão para esta ação.";
+  }
+  if (message.includes("INVALID_BATERIA_PAYLOAD")) {
+    return "Dados inválidos das baterias.";
+  }
+  return "Falha ao salvar baterias.";
+}
+
 function createSlug(title: string) {
   return title
     .toLowerCase()
@@ -206,6 +228,23 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [capacityWarning, setCapacityWarning] = useState<{
+    open: boolean;
+    bateriaLabel: string;
+    newCapacity: number;
+    reserved: number;
+    resolve?: (proceed: boolean) => void;
+  }>({ open: false, bateriaLabel: "", newCapacity: 0, reserved: 0 });
+
+  function confirmCapacityReduction(args: {
+    bateriaLabel: string;
+    newCapacity: number;
+    reserved: number;
+  }) {
+    return new Promise<boolean>((resolve) => {
+      setCapacityWarning({ ...args, open: true, resolve });
+    });
+  }
   const supabase = useSupabase();
 
   const form = useForm<AdventureFormValues>({
@@ -323,6 +362,26 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
   async function onSubmit(values: AdventureFormValues) {
     setIsSubmitting(true);
 
+    // 1) Validação pre-submit de redução de capacidade abaixo do reservado
+    if (values.hasBaterias && values.baterias) {
+      for (const bateria of values.baterias) {
+        if (!bateria.id) continue;
+        const existing = bateriasAvailability.find((b) => b.id === bateria.id);
+        if (!existing) continue;
+        if (bateria.capacity < existing.reserved) {
+          const proceed = await confirmCapacityReduction({
+            bateriaLabel: existing.label,
+            newCapacity: bateria.capacity,
+            reserved: existing.reserved,
+          });
+          if (!proceed) {
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      }
+    }
+
     const normalizedCustomFields =
       values.customFields?.map((customField) => {
         if (isSelectionFieldType(customField.type)) {
@@ -331,7 +390,6 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
             options: normalizeSelectionOptions(customField.options),
           };
         }
-
         const { options: _options, ...simpleField } = customField;
         return simpleField;
       }) || [];
@@ -350,15 +408,51 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       image_description: values.imageDescription,
       registrations_enabled: values.registrationsEnabled,
       custom_fields: normalizedCustomFields,
+      // NOTE: has_baterias é atualizado via RPC save_adventure_baterias para
+      // garantir atomicidade com o conjunto de baterias.
     };
 
     try {
-      if (adventure?.id) {
-        const { error } = await supabase.from('adventures').update(adventureData).eq('id', adventure.id);
+      let adventureId = adventure?.id;
+      if (adventureId) {
+        const { error } = await supabase
+          .from("adventures")
+          .update(adventureData)
+          .eq("id", adventureId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('adventures').insert(adventureData);
+        const { data, error } = await supabase
+          .from("adventures")
+          .insert({ ...adventureData, has_baterias: false })
+          .select("id")
+          .single();
         if (error) throw error;
+        adventureId = data.id as string;
+      }
+
+      const bateriasPayload = (values.baterias ?? []).map((b, index) => ({
+        id: b.id,
+        label: b.label,
+        start_time: b.start_time,
+        end_time: b.end_time,
+        capacity: b.capacity,
+        sort_order: index,
+      }));
+
+      const { error: bateriaError } = await supabase.rpc("save_adventure_baterias", {
+        p_adventure_id: adventureId,
+        p_has_baterias: values.hasBaterias,
+        p_baterias: bateriasPayload,
+      });
+
+      if (bateriaError) {
+        toast({
+          title: "Falha ao salvar baterias",
+          description: getSaveBateriasErrorMessage(bateriaError),
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
       }
 
       toast({
@@ -366,7 +460,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
         description: `"${values.title}" foi salva.`,
       });
       router.push("/admin/adventures");
-      router.refresh(); // revalidate cache
+      router.refresh();
     } catch (error) {
       console.error("Failed to save adventure:", error);
       toast({
@@ -994,6 +1088,44 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
             {isSubmitting ? "Salvando..." : "Salvar Alterações"}
           </Button>
         </div>
+        <AlertDialog
+          open={capacityWarning.open}
+          onOpenChange={(open) => {
+            if (!open) {
+              capacityWarning.resolve?.(false);
+              setCapacityWarning((prev) => ({ ...prev, open: false }));
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reduzir capacidade?</AlertDialogTitle>
+              <AlertDialogDescription>
+                A Bateria &quot;{capacityWarning.bateriaLabel}&quot; tem {capacityWarning.reserved}{" "}
+                inscrições e você está reduzindo a capacidade para {capacityWarning.newCapacity}. As
+                inscrições atuais serão mantidas, mas a bateria ficará com excedente. Deseja continuar?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => {
+                  capacityWarning.resolve?.(false);
+                  setCapacityWarning((prev) => ({ ...prev, open: false }));
+                }}
+              >
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  capacityWarning.resolve?.(true);
+                  setCapacityWarning((prev) => ({ ...prev, open: false }));
+                }}
+              >
+                Salvar mesmo assim
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </form>
     </Form>
   );
