@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -522,9 +522,34 @@ export function RegistrationForm({
     return bateria.capacity - bateria.reserved - allocated;
   }
 
+  function findFirstErrorMessage(errors: unknown): string | null {
+    if (!errors || typeof errors !== "object") return null;
+    for (const value of Object.values(errors as Record<string, unknown>)) {
+      if (!value || typeof value !== "object") continue;
+      const obj = value as Record<string, unknown>;
+      if (typeof obj.message === "string" && obj.message.length > 0) {
+        return obj.message;
+      }
+      const nested = findFirstErrorMessage(obj);
+      if (nested) return nested;
+    }
+    return null;
+  }
+
+  function handleInvalid(errors: FieldErrors<RegistrationFormValues>) {
+    const firstMessage =
+      findFirstErrorMessage(errors) ??
+      "Preencha os campos obrigatórios antes de enviar a inscrição.";
+    toast({
+      title: "Não foi possível enviar",
+      description: firstMessage,
+      variant: "destructive",
+    });
+  }
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit, handleInvalid)} className="space-y-6">
         {hasBaterias && bateriasState && (
           <div className="rounded-lg border bg-muted/30 p-3">
             <p className="text-sm font-semibold mb-2">Vagas por Bateria</p>
