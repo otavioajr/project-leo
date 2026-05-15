@@ -246,6 +246,7 @@ export default function RegistrationsPage() {
       await exportRegistrationsToXlsx({
         adventureTitle,
         registrations: filteredRegistrations,
+        bateriaLabels: bateriaLabelMap,
       });
 
       toast({
