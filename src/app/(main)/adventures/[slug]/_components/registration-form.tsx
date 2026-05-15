@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import type {
+  BateriaAvailability,
   CustomField,
   RegistrationCustomData,
   RegistrationCustomValue,
@@ -64,13 +65,16 @@ function isRequiredCustomValueFilled(
   return typeof value === "string" && value.trim() !== "";
 }
 
-const participantSchema = z.object({
-  name: z.string().min(2, "O nome do participante é obrigatório."),
-}).catchall(z.string());
+const participantSchema = z
+  .object({
+    name: z.string().min(2, "O nome do participante é obrigatório."),
+    bateriaId: z.string().optional(),
+  })
+  .catchall(z.string());
 
 const PIX_MAX_GROUP_SIZE = 4;
 
-function createRegistrationSchema(remainingSpots: number | null) {
+function createRegistrationSchema(remainingSpots: number | null, hasBaterias: boolean) {
   let groupSizeSchema = z
     .coerce.number()
     .int("Use um número inteiro.")
@@ -84,14 +88,35 @@ function createRegistrationSchema(remainingSpots: number | null) {
     );
   }
 
-  return z.object({
-    name: z.string().min(2, "O nome do contato deve ter pelo menos 2 caracteres."),
-    email: z.string().email("Por favor, insira um endereço de e-mail válido."),
-    phone: z.string().min(10, "Por favor, insira um número de telefone válido."),
-    groupSize: groupSizeSchema,
-    customData: z.record(customDataValueSchema).optional(),
-    participants: z.array(participantSchema),
-  });
+  return z
+    .object({
+      name: z.string().min(2, "O nome do contato deve ter pelo menos 2 caracteres."),
+      email: z.string().email("Por favor, insira um endereço de e-mail válido."),
+      phone: z.string().min(10, "Por favor, insira um número de telefone válido."),
+      groupSize: groupSizeSchema,
+      customData: z.record(customDataValueSchema).optional(),
+      participants: z.array(participantSchema),
+      principalBateriaId: z.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (!hasBaterias) return;
+      if (!data.principalBateriaId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Selecione uma bateria.",
+          path: ["principalBateriaId"],
+        });
+      }
+      data.participants.forEach((p, index) => {
+        if (!p.bateriaId) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Selecione uma bateria.",
+            path: ["participants", index, "bateriaId"],
+          });
+        }
+      });
+    });
 }
 
 type RegistrationFormValues = z.infer<ReturnType<typeof createRegistrationSchema>>;
@@ -103,6 +128,7 @@ type RegistrationFormProps = {
   adventurePrice: number;
   customFields?: CustomField[];
   remainingSpots: number | null;
+  baterias: BateriaAvailability[] | null;
 };
 
 type RegistrationRpcErrorId =
@@ -110,6 +136,9 @@ type RegistrationRpcErrorId =
   | "ADVENTURE_NOT_FOUND"
   | "INVALID_GROUP_SIZE"
   | "REGISTRATIONS_DISABLED"
+  | "BATERIA_ASSIGNMENTS_MISMATCH"
+  | "BATERIA_NOT_FOUND"
+  | "BATERIA_CAPACITY_EXCEEDED"
   | "UNKNOWN";
 
 function getErrorString(value: unknown) {
@@ -155,14 +184,77 @@ function normalizeRegistrationRpcError(error: unknown): RegistrationRpcErrorId {
     return "REGISTRATIONS_DISABLED";
   }
 
+  if (matchesIdentifier("BATERIA_CAPACITY_EXCEEDED")) {
+    return "BATERIA_CAPACITY_EXCEEDED";
+  }
+
+  if (matchesIdentifier("BATERIA_ASSIGNMENTS_MISMATCH")) {
+    return "BATERIA_ASSIGNMENTS_MISMATCH";
+  }
+
+  if (matchesIdentifier("BATERIA_NOT_FOUND")) {
+    return "BATERIA_NOT_FOUND";
+  }
+
   return "UNKNOWN";
 }
 
-export function RegistrationForm({ adventureId, adventureSlug, customFields, remainingSpots }: RegistrationFormProps) {
+export function RegistrationForm({
+  adventureId,
+  adventureSlug,
+  customFields,
+  remainingSpots,
+  baterias,
+}: RegistrationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const supabase = useSupabase();
   const router = useRouter();
+
+  const [bateriasState, setBateriasState] = useState<BateriaAvailability[] | null>(baterias);
+
+  useEffect(() => {
+    setBateriasState(baterias);
+  }, [baterias]);
+
+  const hasBaterias = (bateriasState?.length ?? 0) > 0;
+
+  useEffect(() => {
+    if (!hasBaterias) return;
+    const channel = supabase
+      .channel(`baterias-${adventureId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "adventure_baterias", filter: `adventure_id=eq.${adventureId}` },
+        async () => {
+          const { data, error } = await supabase
+            .rpc("get_adventure_baterias_with_availability", { p_adventure_id: adventureId });
+          if (error) {
+            console.error("Failed to refresh baterias:", error);
+            return;
+          }
+          setBateriasState((data ?? []) as BateriaAvailability[]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "registrations", filter: `adventure_id=eq.${adventureId}` },
+        async () => {
+          const { data, error } = await supabase
+            .rpc("get_adventure_baterias_with_availability", { p_adventure_id: adventureId });
+          if (error) {
+            console.error("Failed to refresh baterias:", error);
+            return;
+          }
+          setBateriasState((data ?? []) as BateriaAvailability[]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [adventureId, hasBaterias, supabase]);
 
   const allCustomFields = customFields ?? [];
   const participantCustomFields = allCustomFields.filter(isSimpleCustomField);
@@ -173,7 +265,7 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
   });
 
   const form = useForm<RegistrationFormValues>({
-    resolver: zodResolver(createRegistrationSchema(remainingSpots)),
+    resolver: zodResolver(createRegistrationSchema(remainingSpots, hasBaterias)),
     defaultValues: {
       name: "",
       email: "",
@@ -181,6 +273,7 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
       groupSize: 1,
       customData: initialCustomData,
       participants: [],
+      principalBateriaId: hasBaterias ? "" : undefined,
     },
   });
 
@@ -205,9 +298,12 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
     );
 
     if (desiredParticipantCount > currentParticipantCount) {
-      const newFields: { name: string; [key: string]: string }[] = [];
+      const newFields: { name: string; bateriaId: string; [key: string]: string }[] = [];
       for (let i = 0; i < desiredParticipantCount - currentParticipantCount; i++) {
-        const newParticipant: { name: string; [key: string]: string } = { name: "" };
+        const newParticipant: { name: string; bateriaId: string; [key: string]: string } = {
+          name: "",
+          bateriaId: "",
+        };
         additionalParticipantFields.forEach((field) => {
           newParticipant[field.name] = "";
         });
@@ -296,6 +392,13 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
         }
       );
 
+      const bateriaAssignments = hasBaterias
+        ? {
+            principal: values.principalBateriaId,
+            participants: values.participants.map((p) => p.bateriaId ?? ""),
+          }
+        : null;
+
       const { data, error } = await supabase.rpc(
         "create_registration_with_capacity",
         {
@@ -306,6 +409,7 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
           p_group_size: values.groupSize,
           p_participants: participantsPayload,
           p_custom_data: customDataPayload,
+          p_bateria_assignments: bateriaAssignments,
         }
       );
 
@@ -362,6 +466,33 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
         return;
       }
 
+      if (rpcErrorId === "BATERIA_ASSIGNMENTS_MISMATCH") {
+        toast({
+          title: "Bateria não selecionada",
+          description: "Selecione uma bateria para cada participante.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (rpcErrorId === "BATERIA_NOT_FOUND") {
+        toast({
+          title: "Bateria indisponível",
+          description: "Bateria não encontrada. Recarregue a página e tente de novo.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (rpcErrorId === "BATERIA_CAPACITY_EXCEEDED") {
+        toast({
+          title: "Vagas esgotadas",
+          description: "As vagas dessa bateria se esgotaram. Recarregue e escolha outra.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({
         title: "Falha na Inscrição",
         description: "Algo deu errado. Por favor, tente novamente.",
@@ -374,9 +505,74 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
     }
   }
 
+  const principalBateriaId = form.watch("principalBateriaId");
+  const watchedParticipants = form.watch("participants");
+
+  function computeAvailableForBateria(bateriaId: string, excludeIndex: number | "principal"): number {
+    if (!bateriasState) return 0;
+    const bateria = bateriasState.find((b) => b.id === bateriaId);
+    if (!bateria) return 0;
+    let allocated = 0;
+    if (excludeIndex !== "principal" && principalBateriaId === bateriaId) {
+      allocated += 1;
+    }
+    watchedParticipants.forEach((p, idx) => {
+      if (idx === excludeIndex) return;
+      if (p.bateriaId === bateriaId) {
+        allocated += 1;
+      }
+    });
+    return bateria.capacity - bateria.reserved - allocated;
+  }
+
+  function findFirstErrorMessage(errors: unknown): string | null {
+    if (!errors || typeof errors !== "object") return null;
+    for (const value of Object.values(errors as Record<string, unknown>)) {
+      if (!value || typeof value !== "object") continue;
+      const obj = value as Record<string, unknown>;
+      if (typeof obj.message === "string" && obj.message.length > 0) {
+        return obj.message;
+      }
+      const nested = findFirstErrorMessage(obj);
+      if (nested) return nested;
+    }
+    return null;
+  }
+
+  function handleInvalid(errors: FieldErrors<RegistrationFormValues>) {
+    const firstMessage =
+      findFirstErrorMessage(errors) ??
+      "Preencha os campos obrigatórios antes de enviar a inscrição.";
+    toast({
+      title: "Não foi possível enviar",
+      description: firstMessage,
+      variant: "destructive",
+    });
+  }
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit, handleInvalid)} className="space-y-6">
+        {hasBaterias && bateriasState && (
+          <div className="rounded-lg border bg-muted/30 p-3">
+            <p className="text-sm font-semibold mb-2">Vagas por Bateria</p>
+            <ul className="space-y-1 text-sm">
+              {bateriasState.map((b) => {
+                const remaining = Math.max(b.capacity - b.reserved, 0);
+                return (
+                  <li key={b.id} className="flex justify-between">
+                    <span>
+                      {b.label} ({b.start_time.slice(0, 5)}-{b.end_time.slice(0, 5)})
+                    </span>
+                    <span className={remaining > 0 ? "text-green-700 font-semibold" : "text-destructive font-semibold"}>
+                      {remaining > 0 ? `${remaining} ${remaining === 1 ? "vaga" : "vagas"}` : "sem vagas"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
         <FormField
           control={form.control}
           name="groupSize"
@@ -444,6 +640,37 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
             </FormItem>
           )}
         />
+        {hasBaterias && bateriasState && (
+          <FormField
+            control={form.control}
+            name="principalBateriaId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Bateria</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma bateria" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {bateriasState.map((b) => {
+                      const available = computeAvailableForBateria(b.id, "principal");
+                      const disabled = available < 1 && field.value !== b.id;
+                      return (
+                        <SelectItem key={b.id} value={b.id} disabled={disabled}>
+                          {b.label} — {b.start_time.slice(0, 5)}-{b.end_time.slice(0, 5)}{" "}
+                          {disabled ? "(sem vagas)" : `(${Math.max(available, 0)} ${available === 1 ? "vaga" : "vagas"})`}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         {allCustomFields.map((customField) => (
           <FormField
             key={customField.name}
@@ -561,6 +788,37 @@ export function RegistrationForm({ adventureId, adventureSlug, customFields, rem
                 </FormItem>
               )}
             />
+            {hasBaterias && bateriasState && (
+              <FormField
+                control={form.control}
+                name={`participants.${index}.bateriaId`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bateria</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma bateria" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {bateriasState.map((b) => {
+                          const available = computeAvailableForBateria(b.id, index);
+                          const disabled = available < 1 && field.value !== b.id;
+                          return (
+                            <SelectItem key={b.id} value={b.id} disabled={disabled}>
+                              {b.label} — {b.start_time.slice(0, 5)}-{b.end_time.slice(0, 5)}{" "}
+                              {disabled ? "(sem vagas)" : `(${Math.max(available, 0)} ${available === 1 ? "vaga" : "vagas"})`}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             {participantCustomFields.map((customField) => (
               <FormField
                 key={customField.name}

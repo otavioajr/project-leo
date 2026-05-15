@@ -1,12 +1,12 @@
 "use client";
 
 import { z } from "zod";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import type { Adventure } from "@/lib/types";
+import type { Adventure, BateriaAvailability } from "@/lib/types";
 import { useSupabase } from "@/supabase/hooks";
 
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Trash, PlusCircle } from "lucide-react";
 import { ImageUpload } from "@/components/image-upload";
@@ -121,29 +129,88 @@ const customFieldSchema = z
     });
   });
 
-const adventureSchema = z.object({
-  title: z.string().min(3, "O titulo deve ter pelo menos 3 caracteres."),
-  description: z.string().min(10, "A descricao curta deve ter pelo menos 10 caracteres.").max(150, "A descricao curta deve ter menos de 150 caracteres."),
-  longDescription: z.string().min(20, "A descricao longa deve ter pelo menos 20 caracteres."),
-  maxParticipants: z.preprocess(
-    (value) => value === "" ? null : value,
-    z.union([z.coerce.number().int("Use um numero inteiro.").min(1, "O limite deve ser pelo menos 1."), z.null()])
-  ),
-  price: z.coerce.number().min(0, "O preco deve ser um numero positivo."),
-  duration: z.string().min(1, "A duracao e obrigatoria."),
-  location: z.string().min(1, "A localizacao e obrigatoria."),
-  difficulty: z.enum(["Fácil", "Moderado", "Desafiador"]),
-  imageUrl: z.string().min(1, "A imagem e obrigatoria.").url("URL da imagem invalida."),
-  imageDescription: z.string().min(1, "A descricao da imagem e obrigatoria."),
-  registrationsEnabled: z.boolean(),
-  customFields: z.array(customFieldSchema).optional(),
-});
+const bateriaSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    label: z.string().min(1, "Nome da bateria é obrigatório."),
+    start_time: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use formato HH:MM."),
+    end_time: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use formato HH:MM."),
+    capacity: z.coerce.number().int("Use um número inteiro.").min(1, "Capacidade mínima é 1."),
+  })
+  .refine((b) => b.end_time > b.start_time, {
+    message: "Horário final deve ser maior que o inicial.",
+    path: ["end_time"],
+  });
+
+const adventureSchema = z
+  .object({
+    title: z.string().min(3, "O titulo deve ter pelo menos 3 caracteres."),
+    description: z
+      .string()
+      .min(10, "A descricao curta deve ter pelo menos 10 caracteres.")
+      .max(150, "A descricao curta deve ter menos de 150 caracteres."),
+    longDescription: z
+      .string()
+      .min(20, "A descricao longa deve ter pelo menos 20 caracteres."),
+    maxParticipants: z.preprocess(
+      (value) => (value === "" ? null : value),
+      z.union([
+        z.coerce.number().int("Use um numero inteiro.").min(1, "O limite deve ser pelo menos 1."),
+        z.null(),
+      ])
+    ),
+    price: z.coerce.number().min(0, "O preco deve ser um numero positivo."),
+    duration: z.string().min(1, "A duracao e obrigatoria."),
+    location: z.string(),
+    difficulty: z.enum(["Fácil", "Moderado", "Desafiador"]),
+    imageUrl: z.union([z.literal(""), z.string().url("URL da imagem invalida.")]),
+    imageDescription: z.string(),
+    registrationsEnabled: z.boolean(),
+    hasBaterias: z.boolean(),
+    baterias: z.array(bateriaSchema).optional(),
+    customFields: z.array(customFieldSchema).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.hasBaterias && (!data.baterias || data.baterias.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Adicione pelo menos uma bateria.",
+        path: ["baterias"],
+      });
+    }
+  });
 
 type AdventureFormValues = z.infer<typeof adventureSchema>;
 
 type AdventureFormProps = {
   adventure?: Adventure;
 };
+
+function getSaveBateriasErrorMessage(error: unknown): string {
+  const message = typeof (error as { message?: unknown })?.message === "string"
+    ? (error as { message: string }).message
+    : "";
+  if (message.includes("CANNOT_DISABLE_BATERIAS_WITH_REGISTRATIONS")) {
+    return "Não é possível desativar baterias com inscrições ativas. Cancele as inscrições primeiro.";
+  }
+  if (message.includes("CANNOT_ENABLE_BATERIAS_WITH_REGISTRATIONS")) {
+    return "Não é possível ativar baterias com inscrições já existentes. Cancele as inscrições primeiro.";
+  }
+  if (message.includes("BATERIA_HAS_REGISTRATIONS")) {
+    return "Uma das baterias removidas tem inscrições. Cancele as inscrições primeiro.";
+  }
+  if (message.includes("NOT_AUTHORIZED")) {
+    return "Sem permissão para esta ação.";
+  }
+  if (message.includes("INVALID_BATERIA_PAYLOAD")) {
+    return "Dados inválidos das baterias.";
+  }
+  return "Falha ao salvar baterias.";
+}
 
 function createSlug(title: string) {
   return title
@@ -161,6 +228,23 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [capacityWarning, setCapacityWarning] = useState<{
+    open: boolean;
+    bateriaLabel: string;
+    newCapacity: number;
+    reserved: number;
+    resolve?: (proceed: boolean) => void;
+  }>({ open: false, bateriaLabel: "", newCapacity: 0, reserved: 0 });
+
+  function confirmCapacityReduction(args: {
+    bateriaLabel: string;
+    newCapacity: number;
+    reserved: number;
+  }) {
+    return new Promise<boolean>((resolve) => {
+      setCapacityWarning({ ...args, open: true, resolve });
+    });
+  }
   const supabase = useSupabase();
 
   const form = useForm<AdventureFormValues>({
@@ -177,6 +261,8 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       imageUrl: adventure?.image_url || "",
       imageDescription: adventure?.image_description || "",
       registrationsEnabled: adventure?.registrations_enabled ?? true,
+      hasBaterias: adventure?.has_baterias ?? false,
+      baterias: [],
       customFields: (adventure?.custom_fields ?? []).map((customField) => {
         if (isSelectionFieldType(customField.type)) {
           return {
@@ -190,6 +276,46 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       }),
     },
   });
+
+  const [bateriasAvailability, setBateriasAvailability] = useState<BateriaAvailability[]>([]);
+
+  const bateriasFieldArray = useFieldArray({
+    control: form.control,
+    name: "baterias",
+  });
+
+  useEffect(() => {
+    if (!adventure?.id) return;
+    let cancelled = false;
+    async function load() {
+      const { data, error } = await supabase
+        .rpc("get_adventure_baterias_with_availability", { p_adventure_id: adventure!.id });
+      if (cancelled) return;
+      if (error) {
+        console.error("Failed to load baterias:", error);
+        return;
+      }
+      const list = (data ?? []) as BateriaAvailability[];
+      setBateriasAvailability(list);
+      if (list.length > 0) {
+        form.setValue(
+          "baterias",
+          list.map((b) => ({
+            id: b.id,
+            label: b.label,
+            start_time: b.start_time.slice(0, 5),
+            end_time: b.end_time.slice(0, 5),
+            capacity: b.capacity,
+          })),
+          { shouldDirty: false }
+        );
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [adventure?.id, supabase, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -236,6 +362,26 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
   async function onSubmit(values: AdventureFormValues) {
     setIsSubmitting(true);
 
+    // 1) Validação pre-submit de redução de capacidade abaixo do reservado
+    if (values.hasBaterias && values.baterias) {
+      for (const bateria of values.baterias) {
+        if (!bateria.id) continue;
+        const existing = bateriasAvailability.find((b) => b.id === bateria.id);
+        if (!existing) continue;
+        if (bateria.capacity < existing.reserved) {
+          const proceed = await confirmCapacityReduction({
+            bateriaLabel: existing.label,
+            newCapacity: bateria.capacity,
+            reserved: existing.reserved,
+          });
+          if (!proceed) {
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      }
+    }
+
     const normalizedCustomFields =
       values.customFields?.map((customField) => {
         if (isSelectionFieldType(customField.type)) {
@@ -244,7 +390,6 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
             options: normalizeSelectionOptions(customField.options),
           };
         }
-
         const { options: _options, ...simpleField } = customField;
         return simpleField;
       }) || [];
@@ -263,15 +408,51 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       image_description: values.imageDescription,
       registrations_enabled: values.registrationsEnabled,
       custom_fields: normalizedCustomFields,
+      // NOTE: has_baterias é atualizado via RPC save_adventure_baterias para
+      // garantir atomicidade com o conjunto de baterias.
     };
 
     try {
-      if (adventure?.id) {
-        const { error } = await supabase.from('adventures').update(adventureData).eq('id', adventure.id);
+      let adventureId = adventure?.id;
+      if (adventureId) {
+        const { error } = await supabase
+          .from("adventures")
+          .update(adventureData)
+          .eq("id", adventureId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('adventures').insert(adventureData);
+        const { data, error } = await supabase
+          .from("adventures")
+          .insert({ ...adventureData, has_baterias: false })
+          .select("id")
+          .single();
         if (error) throw error;
+        adventureId = data.id as string;
+      }
+
+      const bateriasPayload = (values.baterias ?? []).map((b, index) => ({
+        id: b.id,
+        label: b.label,
+        start_time: b.start_time,
+        end_time: b.end_time,
+        capacity: b.capacity,
+        sort_order: index,
+      }));
+
+      const { error: bateriaError } = await supabase.rpc("save_adventure_baterias", {
+        p_adventure_id: adventureId,
+        p_has_baterias: values.hasBaterias,
+        p_baterias: bateriasPayload,
+      });
+
+      if (bateriaError) {
+        toast({
+          title: "Falha ao salvar baterias",
+          description: getSaveBateriasErrorMessage(bateriaError),
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
       }
 
       toast({
@@ -279,7 +460,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
         description: `"${values.title}" foi salva.`,
       });
       router.push("/admin/adventures");
-      router.refresh(); // revalidate cache
+      router.refresh();
     } catch (error) {
       console.error("Failed to save adventure:", error);
       toast({
@@ -315,9 +496,34 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
     }
   }
 
+  function findFirstErrorMessage(errors: unknown): string | null {
+    if (!errors || typeof errors !== "object") return null;
+    for (const value of Object.values(errors as Record<string, unknown>)) {
+      if (!value || typeof value !== "object") continue;
+      const obj = value as Record<string, unknown>;
+      if (typeof obj.message === "string" && obj.message.length > 0) {
+        return obj.message;
+      }
+      const nested = findFirstErrorMessage(obj);
+      if (nested) return nested;
+    }
+    return null;
+  }
+
+  function handleInvalid(errors: FieldErrors<AdventureFormValues>) {
+    const firstMessage =
+      findFirstErrorMessage(errors) ??
+      "Preencha os campos obrigatórios antes de salvar.";
+    toast({
+      title: "Não foi possível salvar",
+      description: firstMessage,
+      variant: "destructive",
+    });
+  }
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={form.handleSubmit(onSubmit, handleInvalid)} className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-8">
             <FormField
@@ -398,24 +604,30 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
             <FormField
               control={form.control}
               name="maxParticipants"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Limite Máximo de Pessoas</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="1"
-                      placeholder="Deixe em branco para ilimitado"
-                      value={field.value ?? ""}
-                      onChange={(event) => field.onChange(event.target.value)}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Define quantas pessoas, no total, podem participar desta aventura.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const hasBaterias = form.watch("hasBaterias");
+                return (
+                  <FormItem>
+                    <FormLabel>Limite Máximo de Pessoas</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="1"
+                        placeholder="Deixe em branco para ilimitado"
+                        value={field.value ?? ""}
+                        onChange={(event) => field.onChange(event.target.value)}
+                        disabled={hasBaterias}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {hasBaterias
+                        ? "Não usado quando baterias estão ativas — a capacidade é definida por bateria."
+                        : "Define quantas pessoas, no total, podem participar desta aventura."}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             <FormField
               control={form.control}
@@ -498,8 +710,180 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                     </FormItem>
                 )}
                 />
+            <FormField
+              control={form.control}
+              name="hasBaterias"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel>Habilitar Baterias</FormLabel>
+                    <FormDescription>
+                      Oferecer múltiplos horários para esta aventura, cada um com capacidade própria.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
           </div>
         </div>
+
+        {form.watch("hasBaterias") && (
+          <div className="space-y-3 rounded-md border p-4 bg-muted/20">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold">Baterias</h4>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const next = bateriasFieldArray.fields.length + 1;
+                  bateriasFieldArray.append({
+                    label: `Bateria ${next}`,
+                    start_time: "08:00",
+                    end_time: "10:00",
+                    capacity: 10,
+                  });
+                }}
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Adicionar Bateria
+              </Button>
+            </div>
+            {bateriasFieldArray.fields.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Nenhuma bateria configurada. Adicione pelo menos uma.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8">#</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead className="w-24">Início</TableHead>
+                    <TableHead className="w-24">Fim</TableHead>
+                    <TableHead className="w-20">Cap.</TableHead>
+                    <TableHead className="w-10"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bateriasFieldArray.fields.map((field, index) => (
+                    <TableRow key={field.id}>
+                      <TableCell className="text-xs text-muted-foreground">{index + 1}</TableCell>
+                      <TableCell>
+                        <FormField
+                          control={form.control}
+                          name={`baterias.${index}.label`}
+                          render={({ field: f }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input {...f} placeholder="ex: Turma Manhã" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <FormField
+                          control={form.control}
+                          name={`baterias.${index}.start_time`}
+                          render={({ field: f }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input {...f} placeholder="08:00" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <FormField
+                          control={form.control}
+                          name={`baterias.${index}.end_time`}
+                          render={({ field: f }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input {...f} placeholder="10:00" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <FormField
+                          control={form.control}
+                          name={`baterias.${index}.capacity`}
+                          render={({ field: f }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input type="number" min="1" {...f} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={async () => {
+                            const baterias = form.getValues("baterias") ?? [];
+                            const current = baterias[index];
+                            if (current?.id) {
+                              const { error } = await supabase.rpc("delete_adventure_bateria", {
+                                p_bateria_id: current.id,
+                              });
+                              if (error) {
+                                const message = String(error.message || "");
+                                if (message.includes("BATERIA_HAS_REGISTRATIONS")) {
+                                  toast({
+                                    title: "Bateria com inscrições",
+                                    description:
+                                      "Não é possível remover uma bateria com inscrições. Cancele as inscrições primeiro.",
+                                    variant: "destructive",
+                                  });
+                                  return;
+                                }
+                                toast({
+                                  title: "Falha ao remover",
+                                  description: "Algo deu errado. Tente novamente.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                            }
+                            bateriasFieldArray.remove(index);
+                            setBateriasAvailability((prev) =>
+                              prev.filter((b) => b.id !== current?.id)
+                            );
+                          }}
+                        >
+                          <Trash className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            <FormField
+              control={form.control}
+              name="baterias"
+              render={() => (
+                <FormItem>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        )}
 
         <Separator />
 
@@ -729,6 +1113,44 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
             {isSubmitting ? "Salvando..." : "Salvar Alterações"}
           </Button>
         </div>
+        <AlertDialog
+          open={capacityWarning.open}
+          onOpenChange={(open) => {
+            if (!open) {
+              capacityWarning.resolve?.(false);
+              setCapacityWarning((prev) => ({ ...prev, open: false }));
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reduzir capacidade?</AlertDialogTitle>
+              <AlertDialogDescription>
+                A Bateria &quot;{capacityWarning.bateriaLabel}&quot; tem {capacityWarning.reserved}{" "}
+                inscrições e você está reduzindo a capacidade para {capacityWarning.newCapacity}. As
+                inscrições atuais serão mantidas, mas a bateria ficará com excedente. Deseja continuar?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => {
+                  capacityWarning.resolve?.(false);
+                  setCapacityWarning((prev) => ({ ...prev, open: false }));
+                }}
+              >
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  capacityWarning.resolve?.(true);
+                  setCapacityWarning((prev) => ({ ...prev, open: false }));
+                }}
+              >
+                Salvar mesmo assim
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </form>
     </Form>
   );

@@ -9,6 +9,7 @@ type ExportRowKind = "Titular" | "Participante";
 export type ExportRegistrationsInput = {
   adventureTitle: string;
   registrations: Registration[];
+  bateriaLabels?: Map<string, string>;
 };
 
 export type ExportRegistrationsCustomColumn = {
@@ -24,6 +25,7 @@ export type ExportRegistrationRow = {
   rowKind: ExportRowKind;
   groupPosition: number;
   personName: string;
+  bateriaLabel: string;
   contactName: string;
   contactEmail: string;
   contactPhone: string;
@@ -167,7 +169,8 @@ function mapCustomValues(
 
 function flattenRegistration(
   registration: Registration,
-  customColumns: ExportRegistrationsCustomColumn[]
+  customColumns: ExportRegistrationsCustomColumn[],
+  bateriaLabels: Map<string, string> | undefined
 ): ExportRegistrationRow[] {
   const baseRow = {
     registrationId: registration.id,
@@ -182,15 +185,27 @@ function flattenRegistration(
     registrationToken: registration.registration_token ?? EMPTY_CELL,
   };
 
+  function resolveLabel(bateriaId: string | undefined): string {
+    if (!bateriaId) return EMPTY_CELL;
+    return bateriaLabels?.get(bateriaId) ?? EMPTY_CELL;
+  }
+
+  const principalBateria = registration.bateria_assignments
+    ? resolveLabel(registration.bateria_assignments.principal)
+    : EMPTY_CELL;
+
   const rows: ExportRegistrationRow[] = [
     {
       ...baseRow,
       rowKind: "Titular",
       groupPosition: 1,
       personName: registration.name,
+      bateriaLabel: principalBateria,
       customValues: mapCustomValues(customColumns, registration.custom_data),
     },
   ];
+
+  const participantBaterias = registration.bateria_assignments?.participants ?? [];
 
   for (const [index, participant] of (registration.participants ?? []).entries()) {
     rows.push({
@@ -198,6 +213,7 @@ function flattenRegistration(
       rowKind: "Participante",
       groupPosition: index + 2,
       personName: normalizeTextCellValue(participant.name),
+      bateriaLabel: resolveLabel(participantBaterias[index]),
       customValues: mapCustomValues(customColumns, participant),
     });
   }
@@ -269,6 +285,12 @@ function buildExportSchema(
       value: (row) => row.groupPosition,
     },
     {
+      column: "Bateria",
+      type: String,
+      width: 20,
+      value: (row) => row.bateriaLabel,
+    },
+    {
       column: "Nome",
       type: String,
       width: 24,
@@ -319,10 +341,13 @@ function buildExportSchema(
   ];
 }
 
-export function getRegistrationExportRows(registrations: Registration[]) {
+export function getRegistrationExportRows(
+  registrations: Registration[],
+  bateriaLabels?: Map<string, string>
+) {
   const customColumns = collectStableCustomColumns(registrations);
   const rows = registrations.flatMap((registration) =>
-    flattenRegistration(registration, customColumns)
+    flattenRegistration(registration, customColumns, bateriaLabels)
   );
 
   return {
@@ -334,10 +359,11 @@ export function getRegistrationExportRows(registrations: Registration[]) {
 export async function exportRegistrationsToXlsx({
   adventureTitle,
   registrations,
+  bateriaLabels,
 }: ExportRegistrationsInput) {
   const normalizedAdventureTitle =
     adventureTitle.trim() || registrations[0]?.adventure_title || "Aventura";
-  const { customColumns, rows } = getRegistrationExportRows(registrations);
+  const { customColumns, rows } = getRegistrationExportRows(registrations, bateriaLabels);
 
   await writeXlsxFile(rows, {
     schema: buildExportSchema(customColumns),

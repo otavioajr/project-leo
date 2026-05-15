@@ -10,6 +10,32 @@ export type RegistrationCustomValue = string | string[];
 
 export type RegistrationCustomData = Record<string, RegistrationCustomValue>;
 
+export type Bateria = {
+  id: string;
+  adventure_id: string;
+  label: string;
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  sort_order: number;
+  created_at: string;
+};
+
+export type BateriaAvailability = {
+  id: string;
+  label: string;
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  sort_order: number;
+  reserved: number;
+};
+
+export type BateriaAssignments = {
+  principal: string;
+  participants: string[];
+};
+
 export type Adventure = {
   id: string;
   slug: string;
@@ -24,6 +50,7 @@ export type Adventure = {
   image_url: string;
   image_description: string;
   registrations_enabled: boolean;
+  has_baterias: boolean;
   custom_fields?: CustomField[];
   created_at: string;
 };
@@ -42,6 +69,7 @@ export type Registration = {
     total_amount?: number;
     registration_token?: string;
     custom_data?: RegistrationCustomData;
+    bateria_assignments?: BateriaAssignments | null;
 };
 
 export type HomePageContent = {
@@ -52,7 +80,6 @@ export type HomePageContent = {
   heroImageDescription: string;
   adventuresTitle: string;
   adventuresDescription: string;
-  // Redes Sociais
   facebookUrl?: string;
   facebookEnabled?: boolean;
   instagramUrl?: string;
