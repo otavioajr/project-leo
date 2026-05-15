@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -48,7 +48,7 @@ import { ptBR } from "date-fns/locale";
 import { User, Mail, Phone, Users, LoaderCircle, CheckCircle2, Clock, AlertCircle, DollarSign, MoreHorizontal, Trash2 } from "lucide-react";
 import { useCollection } from "@/supabase/use-collection";
 import { useSupabase } from "@/supabase/hooks";
-import type { Adventure, Registration, PaymentStatus } from "@/lib/types";
+import type { Adventure, Registration, PaymentStatus, Bateria } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { exportRegistrationsToXlsx } from "./_lib/export-registrations";
 
@@ -87,6 +87,57 @@ export default function RegistrationsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [registrationToDelete, setRegistrationToDelete] = useState<string | null>(null);
   const [selectedAdventureId, setSelectedAdventureId] = useState<string>("");
+  const [bateriaLabelMap, setBateriaLabelMap] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    const list = (registrations ?? []) as Registration[];
+    const adventureIds = Array.from(
+      new Set(
+        list
+          .filter((r) => r.bateria_assignments)
+          .map((r) => r.adventure_id)
+      )
+    );
+    if (adventureIds.length === 0) {
+      setBateriaLabelMap(new Map());
+      return;
+    }
+    let cancelled = false;
+    async function load() {
+      const { data, error } = await supabase
+        .from("adventure_baterias")
+        .select("id, label")
+        .in("adventure_id", adventureIds);
+      if (cancelled) return;
+      if (error) {
+        console.error("Failed to load bateria labels:", error);
+        return;
+      }
+      const map = new Map<string, string>();
+      (data ?? []).forEach((b: Pick<Bateria, "id" | "label">) => map.set(b.id, b.label));
+      setBateriaLabelMap(map);
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [registrations, supabase]);
+
+  function summarizeBaterias(registration: Registration): string {
+    if (!registration.bateria_assignments) return "—";
+    const ids = [
+      registration.bateria_assignments.principal,
+      ...registration.bateria_assignments.participants,
+    ];
+    const counts = new Map<string, number>();
+    ids.forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1));
+    const parts: string[] = [];
+    for (const [id, count] of counts.entries()) {
+      const label = bateriaLabelMap.get(id) ?? "Bateria?";
+      parts.push(`${label} (${count})`);
+    }
+    return parts.join(", ");
+  }
 
   const sortedAdventures = adventures?.slice().sort((firstAdventure, secondAdventure) =>
     firstAdventure.title.localeCompare(secondAdventure.title, "pt-BR")
@@ -270,6 +321,7 @@ export default function RegistrationsPage() {
               <TableHead>Aventura</TableHead>
               <TableHead>Participantes</TableHead>
               <TableHead>Contato</TableHead>
+              <TableHead>Baterias</TableHead>
               <TableHead>Pagamento</TableHead>
               <TableHead>Data da Inscricao</TableHead>
               <TableHead>Acoes</TableHead>
@@ -314,6 +366,7 @@ export default function RegistrationsPage() {
                       </a>
                     </div>
                   </TableCell>
+                  <TableCell className="text-sm">{summarizeBaterias(reg)}</TableCell>
                   <TableCell>
                     {reg.payment_status ? (
                       <div className="space-y-1">
@@ -375,7 +428,7 @@ export default function RegistrationsPage() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="text-center">
+                <TableCell colSpan={7} className="text-center">
                   {!hasAnyRegistrations
                     ? "Nenhuma inscricao foi recebida ainda."
                     : !hasActiveFilter
