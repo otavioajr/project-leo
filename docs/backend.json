@@ -12,7 +12,7 @@
         "price": { "type": "number" },
         "duration": { "type": "string" },
         "location": { "type": "string" },
-        "difficulty": { "type": "string", "enum": ["Fácil", "Moderado", "Desafiador"] },
+        "difficulty": { "type": ["string", "null"], "description": "Texto livre opcional; null = não exibir no site" },
         "imageUrl": { "type": "string", "format": "uri" },
         "imageDescription": { "type": "string" },
         "registrationsEnabled": { "type": "boolean" },
@@ -30,7 +30,7 @@
           }
         }
       },
-      "required": ["slug", "title", "description", "longDescription", "price", "duration", "location", "difficulty", "imageUrl", "imageDescription", "registrationsEnabled"]
+      "required": ["slug", "title", "description", "longDescription", "price", "duration", "location", "imageUrl", "imageDescription", "registrationsEnabled"]
     },
     "Registration": {
       "title": "Registration",

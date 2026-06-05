@@ -1,13 +1,16 @@
 "use client";
 
 import { z } from "zod";
-import { useForm, useFieldArray, type FieldErrors } from "react-hook-form";
+import { useForm, useFieldArray, Controller, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import type { Adventure, BateriaAvailability } from "@/lib/types";
+import type { Adventure, BateriaAvailability, LoteAvailability } from "@/lib/types";
 import { useSupabase } from "@/supabase/hooks";
+import { normalizePixConfig } from "@/lib/pix-config";
+import { PixConfigDialog } from "./pix-config-dialog";
+import { LotePixField } from "./lote-pix-field";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -38,7 +41,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { Trash, PlusCircle } from "lucide-react";
+import { Trash, PlusCircle, AlertTriangle } from "lucide-react";
 import { ImageUpload } from "@/components/image-upload";
 
 import {
@@ -53,11 +56,17 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-const customFieldTypes = ["text", "email", "tel", "number", "select", "multiselect"] as const;
+const customFieldTypes = [
+  "text", "email", "tel", "number", "select", "multiselect", "tshirt_size",
+] as const;
 type CustomFieldType = (typeof customFieldTypes)[number];
 
-function isSelectionFieldType(type: CustomFieldType) {
-  return type === "select" || type === "multiselect";
+function isOptionsFieldType(type: CustomFieldType) {
+  return type === "select" || type === "multiselect" || type === "tshirt_size";
+}
+
+function isTshirtSizeFieldType(type: CustomFieldType) {
+  return type === "tshirt_size";
 }
 
 function normalizeSelectionOptions(options?: string[]) {
@@ -85,9 +94,10 @@ const customFieldSchema = z
     type: z.enum(customFieldTypes),
     required: z.boolean(),
     options: z.array(z.string()).optional(),
+    helpImageUrl: z.union([z.literal(""), z.string().url("URL da imagem inválida.")]).optional(),
   })
   .superRefine((field, context) => {
-    if (!isSelectionFieldType(field.type)) {
+    if (!isOptionsFieldType(field.type)) {
       return;
     }
 
@@ -146,6 +156,15 @@ const bateriaSchema = z
     path: ["end_time"],
   });
 
+const loteSchema = z.object({
+  id: z.string().uuid().optional(),
+  label: z.string().min(1, "Nome do lote é obrigatório."),
+  sort_order: z.coerce.number().int().min(0),
+  capacity: z.coerce.number().int("Use um número inteiro.").min(1, "Capacidade mínima é 1."),
+  price: z.coerce.number().min(0, "O preço não pode ser negativo."),
+  pixCopiaECola: z.string().default(""),
+});
+
 const adventureSchema = z
   .object({
     title: z.string().min(3, "O titulo deve ter pelo menos 3 caracteres."),
@@ -166,13 +185,25 @@ const adventureSchema = z
     price: z.coerce.number().min(0, "O preco deve ser um numero positivo."),
     duration: z.string().min(1, "A duracao e obrigatoria."),
     location: z.string(),
-    difficulty: z.enum(["Fácil", "Moderado", "Desafiador"]),
+    difficulty: z
+      .string()
+      .max(500, "A dificuldade deve ter no máximo 500 caracteres."),
     imageUrl: z.union([z.literal(""), z.string().url("URL da imagem invalida.")]),
     imageDescription: z.string(),
     registrationsEnabled: z.boolean(),
     hasBaterias: z.boolean(),
     baterias: z.array(bateriaSchema).optional(),
+    hasLotes: z.boolean(),
+    lotes: z.array(loteSchema).optional(),
     customFields: z.array(customFieldSchema).optional(),
+    pixEnabled: z.boolean(),
+    pixCopiaECola: z.object({
+      1: z.string(),
+      2: z.string(),
+      3: z.string(),
+      4: z.string(),
+    }),
+    pixInstructions: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.hasBaterias && (!data.baterias || data.baterias.length === 0)) {
@@ -182,9 +213,45 @@ const adventureSchema = z
         path: ["baterias"],
       });
     }
+    if (data.hasLotes && (!data.lotes || data.lotes.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Adicione pelo menos um lote.",
+        path: ["lotes"],
+      });
+    }
+    if (data.hasLotes && data.hasBaterias) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Lotes e baterias não podem estar ativos ao mesmo tempo.",
+        path: ["hasLotes"],
+      });
+    }
+    if (
+      data.pixEnabled &&
+      data.hasLotes &&
+      data.lotes?.some((l) => !l.pixCopiaECola.trim())
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Cadastre o PIX de todos os lotes para ativar o pagamento.",
+        path: ["pixEnabled"],
+      });
+    }
+    if (
+      data.pixEnabled &&
+      !data.hasLotes &&
+      !Object.values(data.pixCopiaECola).some((s) => s.trim().length > 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Cadastre ao menos uma chave PIX para ativar o pagamento.",
+        path: ["pixEnabled"],
+      });
+    }
   });
 
-type AdventureFormValues = z.infer<typeof adventureSchema>;
+export type AdventureFormValues = z.infer<typeof adventureSchema>;
 
 type AdventureFormProps = {
   adventure?: Adventure;
@@ -210,6 +277,34 @@ function getSaveBateriasErrorMessage(error: unknown): string {
     return "Dados inválidos das baterias.";
   }
   return "Falha ao salvar baterias.";
+}
+
+function getSaveLotesErrorMessage(error: unknown): string {
+  const message = typeof (error as { message?: unknown })?.message === "string"
+    ? (error as { message: string }).message
+    : "";
+  if (message.includes("CANNOT_DISABLE_LOTES_WITH_REGISTRATIONS")) {
+    return "Não é possível desativar lotes com inscrições ativas. Cancele as inscrições primeiro.";
+  }
+  if (message.includes("CANNOT_ENABLE_LOTES_WITH_REGISTRATIONS")) {
+    return "Não é possível ativar lotes com inscrições já existentes. Cancele as inscrições primeiro.";
+  }
+  if (message.includes("CANNOT_ENABLE_LOTES_WITH_BATERIAS")) {
+    return "Não é possível ativar lotes com baterias ativas. Desative as baterias primeiro.";
+  }
+  if (message.includes("LOTE_HAS_REGISTRATIONS")) {
+    return "Um dos lotes removidos tem inscrições. Cancele as inscrições primeiro.";
+  }
+  if (message.includes("LOTE_CAPACITY_BELOW_RESERVED")) {
+    return "Não é possível reduzir vagas abaixo do número de inscrições ativas.";
+  }
+  if (message.includes("NOT_AUTHORIZED")) {
+    return "Sem permissão para esta ação.";
+  }
+  if (message.includes("INVALID_LOTE_PAYLOAD")) {
+    return "Dados inválidos dos lotes.";
+  }
+  return "Falha ao salvar lotes.";
 }
 
 function createSlug(title: string) {
@@ -246,6 +341,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
     });
   }
   const supabase = useSupabase();
+  const pix = normalizePixConfig(adventure?.pix_config);
 
   const form = useForm<AdventureFormValues>({
     resolver: zodResolver(adventureSchema),
@@ -257,31 +353,54 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       price: adventure?.price || 0,
       duration: adventure?.duration || "",
       location: adventure?.location || "",
-      difficulty: adventure?.difficulty || "Moderado",
+      difficulty: adventure?.difficulty ?? "",
       imageUrl: adventure?.image_url || "",
       imageDescription: adventure?.image_description || "",
       registrationsEnabled: adventure?.registrations_enabled ?? true,
       hasBaterias: adventure?.has_baterias ?? false,
       baterias: [],
+      hasLotes: adventure?.has_lotes ?? false,
+      lotes: [],
       customFields: (adventure?.custom_fields ?? []).map((customField) => {
-        if (isSelectionFieldType(customField.type)) {
-          return {
+        if (isOptionsFieldType(customField.type)) {
+          const base = {
             ...customField,
             options: normalizeSelectionOptions(customField.options),
           };
+          if (isTshirtSizeFieldType(customField.type)) {
+            return { ...base, helpImageUrl: customField.helpImageUrl ?? "" };
+          }
+          return base;
         }
 
-        const { options: _options, ...simpleField } = customField;
+        const { options: _options, helpImageUrl: _help, ...simpleField } = customField;
         return simpleField;
       }),
+      pixEnabled: pix.pixEnabled,
+      pixCopiaECola: pix.pixCopiaECola,
+      pixInstructions: pix.instructions ?? "",
     },
   });
 
   const [bateriasAvailability, setBateriasAvailability] = useState<BateriaAvailability[]>([]);
+  const [lotesAvailability, setLotesAvailability] = useState<LoteAvailability[]>([]);
+
+  const pixEnabled = form.watch("pixEnabled");
+  const hasLotes = form.watch("hasLotes");
+  const pixCopiaECola = form.watch("pixCopiaECola");
+  const lotesValues = form.watch("lotes") ?? [];
+  const registeredPixKeysCount = hasLotes
+    ? lotesValues.filter((l) => l.pixCopiaECola.trim().length > 0).length
+    : Object.values(pixCopiaECola).filter((value) => value.trim().length > 0).length;
 
   const bateriasFieldArray = useFieldArray({
     control: form.control,
     name: "baterias",
+  });
+
+  const lotesFieldArray = useFieldArray({
+    control: form.control,
+    name: "lotes",
   });
 
   useEffect(() => {
@@ -317,6 +436,61 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
     };
   }, [adventure?.id, supabase, form]);
 
+  useEffect(() => {
+    if (!adventure?.id) return;
+    let cancelled = false;
+    async function loadLotes() {
+      const { data, error } = await supabase
+        .rpc("get_adventure_lotes_with_availability", { p_adventure_id: adventure!.id });
+      if (cancelled) return;
+      if (error) {
+        console.error("Failed to load lotes:", error);
+        return;
+      }
+      const list = (data ?? []) as LoteAvailability[];
+      setLotesAvailability(list);
+      if (list.length > 0) {
+        form.setValue(
+          "lotes",
+          list.map((l) => ({
+            id: l.id,
+            label: l.label,
+            sort_order: l.sort_order,
+            capacity: l.capacity,
+            price: Number(l.price),
+            pixCopiaECola: "",
+          })),
+          { shouldDirty: false }
+        );
+        const { data: pixRows } = await supabase
+          .from("adventure_lotes")
+          .select("id, pix_copia_cola")
+          .eq("adventure_id", adventure!.id);
+        if (!cancelled && pixRows) {
+          const pixById = Object.fromEntries(
+            pixRows.map((row) => [row.id as string, (row.pix_copia_cola as string) ?? ""])
+          );
+          form.setValue(
+            "lotes",
+            list.map((l) => ({
+              id: l.id,
+              label: l.label,
+              sort_order: l.sort_order,
+              capacity: l.capacity,
+              price: Number(l.price),
+              pixCopiaECola: pixById[l.id] ?? "",
+            })),
+            { shouldDirty: false }
+          );
+        }
+      }
+    }
+    void loadLotes();
+    return () => {
+      cancelled = true;
+    };
+  }, [adventure?.id, supabase, form]);
+
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "customFields",
@@ -324,19 +498,28 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
 
   function handleCustomFieldTypeChange(fieldIndex: number, type: CustomFieldType) {
     const optionsPath = `customFields.${fieldIndex}.options` as const;
+    const helpImagePath = `customFields.${fieldIndex}.helpImageUrl` as const;
+    const labelPath = `customFields.${fieldIndex}.label` as const;
 
-    if (isSelectionFieldType(type)) {
+    if (isOptionsFieldType(type)) {
       const currentOptions = form.getValues(optionsPath);
       if (!currentOptions || currentOptions.length === 0) {
         form.setValue(optionsPath, [""], { shouldDirty: true });
       }
+      if (isTshirtSizeFieldType(type)) {
+        const currentLabel = form.getValues(labelPath);
+        if (!currentLabel?.trim()) {
+          form.setValue(labelPath, "Tamanho de camiseta", { shouldDirty: true });
+        }
+        if (form.getValues(helpImagePath) === undefined) {
+          form.setValue(helpImagePath, "", { shouldDirty: true });
+        }
+      }
       return;
     }
 
-    form.setValue(optionsPath, undefined, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
+    form.setValue(optionsPath, undefined, { shouldDirty: true, shouldValidate: true });
+    form.setValue(helpImagePath, undefined, { shouldDirty: true, shouldValidate: true });
   }
 
   function handleAddOption(fieldIndex: number) {
@@ -362,6 +545,23 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
   async function onSubmit(values: AdventureFormValues) {
     setIsSubmitting(true);
 
+    if (values.hasLotes && values.lotes) {
+      for (const lote of values.lotes) {
+        if (!lote.id) continue;
+        const existing = lotesAvailability.find((l) => l.id === lote.id);
+        if (!existing) continue;
+        if (lote.capacity < existing.reserved) {
+          toast({
+            title: "Capacidade inválida",
+            description: `${existing.label} tem ${existing.reserved} inscrições. Cancele inscrições antes de reduzir as vagas.`,
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+    }
+
     // 1) Validação pre-submit de redução de capacidade abaixo do reservado
     if (values.hasBaterias && values.baterias) {
       for (const bateria of values.baterias) {
@@ -384,13 +584,22 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
 
     const normalizedCustomFields =
       values.customFields?.map((customField) => {
-        if (isSelectionFieldType(customField.type)) {
-          return {
+        if (isOptionsFieldType(customField.type)) {
+          const normalized = {
             ...customField,
             options: normalizeSelectionOptions(customField.options),
           };
+          if (isTshirtSizeFieldType(customField.type)) {
+            const trimmedHelp = customField.helpImageUrl?.trim() ?? "";
+            return {
+              ...normalized,
+              helpImageUrl: trimmedHelp === "" ? undefined : trimmedHelp,
+            };
+          }
+          const { helpImageUrl: _help, ...withoutHelp } = normalized;
+          return withoutHelp;
         }
-        const { options: _options, ...simpleField } = customField;
+        const { options: _options, helpImageUrl: _help, ...simpleField } = customField;
         return simpleField;
       }) || [];
 
@@ -403,13 +612,20 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       price: values.price,
       duration: values.duration,
       location: values.location,
-      difficulty: values.difficulty,
+      difficulty:
+        values.difficulty.trim() === "" ? null : values.difficulty.trim(),
       image_url: values.imageUrl,
       image_description: values.imageDescription,
       registrations_enabled: values.registrationsEnabled,
       custom_fields: normalizedCustomFields,
-      // NOTE: has_baterias é atualizado via RPC save_adventure_baterias para
-      // garantir atomicidade com o conjunto de baterias.
+      pix_config: {
+        pixEnabled: values.pixEnabled,
+        pixCopiaECola: values.hasLotes
+          ? { 1: "", 2: "", 3: "", 4: "" }
+          : values.pixCopiaECola,
+        instructions: values.pixInstructions,
+      },
+      // NOTE: has_baterias e has_lotes são atualizados via RPCs dedicados.
     };
 
     try {
@@ -423,7 +639,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       } else {
         const { data, error } = await supabase
           .from("adventures")
-          .insert({ ...adventureData, has_baterias: false })
+          .insert({ ...adventureData, has_baterias: false, has_lotes: false })
           .select("id")
           .single();
         if (error) throw error;
@@ -449,6 +665,31 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
         toast({
           title: "Falha ao salvar baterias",
           description: getSaveBateriasErrorMessage(bateriaError),
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      const lotesPayload = (values.lotes ?? []).map((l, index) => ({
+        id: l.id,
+        label: l.label,
+        sort_order: index,
+        capacity: l.capacity,
+        price: l.price,
+        pix_copia_cola: l.pixCopiaECola,
+      }));
+
+      const { error: loteError } = await supabase.rpc("save_adventure_lotes", {
+        p_adventure_id: adventureId,
+        p_has_lotes: values.hasLotes,
+        p_lotes: lotesPayload,
+      });
+
+      if (loteError) {
+        toast({
+          title: "Falha ao salvar lotes",
+          description: getSaveLotesErrorMessage(loteError),
           variant: "destructive",
         });
         setIsSubmitting(false);
@@ -606,6 +847,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
               name="maxParticipants"
               render={({ field }) => {
                 const hasBaterias = form.watch("hasBaterias");
+                const hasLotesEnabled = form.watch("hasLotes");
                 return (
                   <FormItem>
                     <FormLabel>Limite Máximo de Pessoas</FormLabel>
@@ -616,13 +858,15 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                         placeholder="Deixe em branco para ilimitado"
                         value={field.value ?? ""}
                         onChange={(event) => field.onChange(event.target.value)}
-                        disabled={hasBaterias}
+                        disabled={hasBaterias || hasLotesEnabled}
                       />
                     </FormControl>
                     <FormDescription>
-                      {hasBaterias
-                        ? "Não usado quando baterias estão ativas — a capacidade é definida por bateria."
-                        : "Define quantas pessoas, no total, podem participar desta aventura."}
+                      {hasLotesEnabled
+                        ? "Não usado quando lotes estão ativos — a capacidade é a soma das vagas dos lotes."
+                        : hasBaterias
+                          ? "Não usado quando baterias estão ativas — a capacidade é definida por bateria."
+                          : "Define quantas pessoas, no total, podem participar desta aventura."}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -632,15 +876,21 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
             <FormField
               control={form.control}
               name="price"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Preço (R$)</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="0.01" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const hasLotesEnabled = form.watch("hasLotes");
+                return (
+                  <FormItem>
+                    <FormLabel>Preço (R$)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" {...field} disabled={hasLotesEnabled} />
+                    </FormControl>
+                    {hasLotesEnabled ? (
+                      <FormDescription>Definido por lote na tabela abaixo.</FormDescription>
+                    ) : null}
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             <FormField
               control={form.control}
@@ -674,18 +924,16 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Dificuldade</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a dificuldade" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Fácil">Fácil</SelectItem>
-                      <SelectItem value="Moderado">Moderado</SelectItem>
-                      <SelectItem value="Desafiador">Desafiador</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <Input
+                      placeholder="ex: Aberto para todos, Difícil com possibilidade para iniciantes"
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Opcional. Deixe em branco para não exibir no site.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -722,13 +970,169 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                     </FormDescription>
                   </div>
                   <FormControl>
-                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={form.watch("hasLotes")}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="hasLotes"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel>Vender por lote</FormLabel>
+                    <FormDescription>
+                      Precificação escalonada com vagas e PIX por lote. Uma pessoa por inscrição.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={form.watch("hasBaterias")}
+                    />
                   </FormControl>
                 </FormItem>
               )}
             />
           </div>
         </div>
+
+        {form.watch("hasLotes") && (
+          <div className="space-y-3 rounded-md border p-4 bg-muted/20">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold">Lotes</h4>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const next = lotesFieldArray.fields.length + 1;
+                  lotesFieldArray.append({
+                    label: `Lote ${next}`,
+                    sort_order: next - 1,
+                    capacity: 10,
+                    price: 0,
+                    pixCopiaECola: "",
+                  });
+                }}
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Adicionar Lote
+              </Button>
+            </div>
+            {lotesFieldArray.fields.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Nenhum lote configurado. Adicione pelo menos um.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {lotesFieldArray.fields.map((field, index) => (
+                  <div key={field.id} className="rounded-md border p-4 space-y-3 bg-background">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">#{index + 1}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          const lotes = form.getValues("lotes") ?? [];
+                          const current = lotes[index];
+                          if (current?.id) {
+                            const existing = lotesAvailability.find((l) => l.id === current.id);
+                            if (existing && existing.reserved > 0) {
+                              toast({
+                                title: "Não é possível remover",
+                                description: "Este lote tem inscrições ativas.",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                          }
+                          lotesFieldArray.remove(index);
+                        }}
+                      >
+                        <Trash className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name={`lotes.${index}.label`}
+                        render={({ field: f }) => (
+                          <FormItem>
+                            <FormLabel>Nome</FormLabel>
+                            <FormControl>
+                              <Input {...f} placeholder="ex: Lote 1" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`lotes.${index}.capacity`}
+                        render={({ field: f }) => (
+                          <FormItem>
+                            <FormLabel>Vagas</FormLabel>
+                            <FormControl>
+                              <Input type="number" min="1" {...f} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`lotes.${index}.price`}
+                        render={({ field: f }) => (
+                          <FormItem>
+                            <FormLabel>Preço (R$)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" min="0" {...f} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name={`lotes.${index}.pixCopiaECola`}
+                      render={({ field: f }) => (
+                        <FormItem>
+                          <FormLabel>PIX copia-e-cola</FormLabel>
+                          <FormControl>
+                            <LotePixField
+                              label={form.watch(`lotes.${index}.label`) || `Lote ${index + 1}`}
+                              value={f.value}
+                              onChange={f.onChange}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+            <FormField
+              control={form.control}
+              name="lotes"
+              render={() => (
+                <FormItem>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        )}
 
         {form.watch("hasBaterias") && (
           <div className="space-y-3 rounded-md border p-4 bg-muted/20">
@@ -887,10 +1291,29 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
 
         <Separator />
 
+        <PixConfigDialog
+          control={form.control}
+          pixEnabled={pixEnabled}
+          registeredKeysCount={registeredPixKeysCount}
+          hasLotes={hasLotes}
+          totalLotesCount={lotesValues.length}
+        />
+        <FormField
+          control={form.control}
+          name="pixEnabled"
+          render={() => (
+            <FormItem>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <Separator />
+
         <div>
             <h3 className="text-xl font-headline font-semibold mb-4">Construtor de Formulário de Inscrição</h3>
             <FormDescription className="mb-4">
-              Configure os campos adicionais. Campos simples aparecem para todos os participantes, enquanto seleção única e seleção múltipla aparecem apenas para o contato principal.
+              Configure os campos adicionais. Campos simples e tamanho de camiseta aparecem para todos os participantes; seleção única e seleção múltipla aparecem apenas para o contato principal.
             </FormDescription>
 
             {/* Campos fixos do sistema */}
@@ -899,11 +1322,11 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
               <div className="space-y-2 text-sm">
                 <div>
                   <p className="font-medium">Contato Principal:</p>
-                  <p className="text-muted-foreground ml-2">Nome Completo, E-mail, Telefone (obrigatórios) + todos os campos personalizados</p>
+                  <p className="text-muted-foreground ml-2">Nome Completo, E-mail, Telefone (obrigatórios) + todos os campos personalizados (incluindo tamanho de camiseta)</p>
                 </div>
                 <div>
                   <p className="font-medium">Participantes Adicionais:</p>
-                  <p className="text-muted-foreground ml-2">Nome Completo (obrigatório) + apenas campos simples (texto, e-mail, telefone e número)</p>
+                  <p className="text-muted-foreground ml-2">Nome Completo (obrigatório) + campos simples (texto, e-mail, telefone e número) e tamanho de camiseta</p>
                 </div>
               </div>
             </div>
@@ -913,7 +1336,8 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                 {fields.map((field, index) => {
                   const customFieldType = form.watch(`customFields.${index}.type` as const) as CustomFieldType;
                   const customFieldOptions = form.watch(`customFields.${index}.options` as const) ?? [];
-                  const shouldShowOptionsEditor = isSelectionFieldType(customFieldType);
+                  const shouldShowOptionsEditor = isOptionsFieldType(customFieldType);
+                  const shouldShowTshirtHelpImage = isTshirtSizeFieldType(customFieldType);
 
                   return (
                     <div key={field.id} className="space-y-4 p-4 border rounded-md">
@@ -970,6 +1394,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                                   <SelectItem value="number">Número</SelectItem>
                                   <SelectItem value="select">Seleção única</SelectItem>
                                   <SelectItem value="multiselect">Seleção múltipla</SelectItem>
+                                  <SelectItem value="tshirt_size">Tamanho de camiseta</SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormMessage />
@@ -1063,6 +1488,39 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                               </FormItem>
                             )}
                           />
+                        </div>
+                      )}
+
+                      {shouldShowTshirtHelpImage && (
+                        <div className="space-y-3 rounded-md border p-3 bg-muted/20">
+                          <div>
+                            <h5 className="text-sm font-medium">Imagem de ajuda</h5>
+                            <p className="text-xs text-muted-foreground">
+                              Tabela de medidas exibida ao cliente ao clicar no botão de orientação.
+                            </p>
+                          </div>
+                          <FormField
+                            control={form.control}
+                            name={`customFields.${index}.helpImageUrl` as const}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <ImageUpload
+                                    value={field.value ?? ""}
+                                    onChange={field.onChange}
+                                    folder="adventures/tshirt-guides"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          {!(form.watch(`customFields.${index}.helpImageUrl` as const) ?? "").trim() && (
+                            <p className="text-xs text-muted-foreground flex items-start gap-2">
+                              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                              Sem imagem de ajuda, o botão de orientação não aparecerá para o cliente no formulário de inscrição.
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>

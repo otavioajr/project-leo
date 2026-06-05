@@ -1,9 +1,10 @@
 export type CustomField = {
   name: string;
   label: string;
-  type: 'text' | 'email' | 'tel' | 'number' | 'select' | 'multiselect';
+  type: 'text' | 'email' | 'tel' | 'number' | 'select' | 'multiselect' | 'tshirt_size';
   required: boolean;
   options?: string[];
+  helpImageUrl?: string;
 };
 
 export type RegistrationCustomValue = string | string[];
@@ -36,6 +37,30 @@ export type BateriaAssignments = {
   participants: string[];
 };
 
+export type Lote = {
+  id: string;
+  adventure_id: string;
+  label: string;
+  sort_order: number;
+  capacity: number;
+  price: number;
+  pix_copia_cola: string;
+  created_at: string;
+};
+
+export type LoteAvailability = {
+  id: string;
+  label: string;
+  sort_order: number;
+  capacity: number;
+  price: number;
+  reserved: number;
+};
+
+export type ActiveLote = LoteAvailability & {
+  remaining: number;
+};
+
 export type Adventure = {
   id: string;
   slug: string;
@@ -46,12 +71,14 @@ export type Adventure = {
   price: number;
   duration: string;
   location: string;
-  difficulty: 'Fácil' | 'Moderado' | 'Desafiador';
+  difficulty: string | null;
   image_url: string;
   image_description: string;
   registrations_enabled: boolean;
   has_baterias: boolean;
+  has_lotes: boolean;
   custom_fields?: CustomField[];
+  pix_config?: PixConfig | null;
   created_at: string;
 };
 
@@ -70,6 +97,7 @@ export type Registration = {
     registration_token?: string;
     custom_data?: RegistrationCustomData;
     bateria_assignments?: BateriaAssignments | null;
+    lote_id?: string | null;
 };
 
 export type HomePageContent = {

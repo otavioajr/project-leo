@@ -1,6 +1,7 @@
 import writeXlsxFile, { type Schema } from "write-excel-file/browser";
 
 import type { Registration, RegistrationCustomValue } from "@/lib/types";
+import { isPlaceholderRegistrationEmail } from "@/lib/registration-contact";
 
 type ExportCellValue = string | number | boolean | Date | null | undefined;
 
@@ -178,8 +179,10 @@ function flattenRegistration(
     registrationDate: formatRegistrationDate(registration.registration_date),
     groupSize: registration.group_size,
     contactName: registration.name,
-    contactEmail: registration.email,
-    contactPhone: registration.phone,
+    contactEmail: isPlaceholderRegistrationEmail(registration.email)
+      ? EMPTY_CELL
+      : registration.email,
+    contactPhone: registration.phone || EMPTY_CELL,
     paymentStatus: formatPaymentStatus(registration.payment_status),
     totalAmount: registration.total_amount ?? null,
     registrationToken: registration.registration_token ?? EMPTY_CELL,

@@ -7,10 +7,13 @@ import { ArrowRight, DollarSign, Timer } from 'lucide-react';
 
 type AdventureCardProps = {
   adventure: Adventure;
+  displayPrice?: number | null;
 };
 
-export function AdventureCard({ adventure }: AdventureCardProps) {
+export function AdventureCard({ adventure, displayPrice }: AdventureCardProps) {
   const adventureSlug = adventure.slug || adventure.id;
+  const price = displayPrice ?? adventure.price;
+  const isSoldOut = displayPrice === null;
 
   return (
     <Card className="group flex flex-col overflow-hidden rounded-xl shadow-md transition-shadow duration-500 ease-out hover:shadow-xl">
@@ -29,10 +32,11 @@ export function AdventureCard({ adventure }: AdventureCardProps) {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
-        {/* Difficulty badge */}
-        <span className="absolute top-3 right-3 px-3 py-1 text-xs font-semibold text-white bg-white/20 backdrop-blur-sm rounded-full">
-          {adventure.difficulty}
-        </span>
+        {adventure.difficulty?.trim() ? (
+          <span className="absolute top-3 right-3 max-w-[85%] px-3 py-1 text-xs font-semibold text-white bg-white/20 backdrop-blur-sm rounded-full line-clamp-1">
+            {adventure.difficulty.trim()}
+          </span>
+        ) : null}
 
         {/* Title over image */}
         <div className="absolute bottom-0 left-0 right-0 p-4">
@@ -50,7 +54,9 @@ export function AdventureCard({ adventure }: AdventureCardProps) {
         <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-1">
             <DollarSign className="h-4 w-4 text-primary" />
-            <span className="font-bold text-primary">R${adventure.price.toFixed(2)}</span>
+            <span className="font-bold text-primary">
+              {isSoldOut ? "Esgotado" : `R$${price.toFixed(2)}`}
+            </span>
           </div>
           <div className="flex items-center gap-1">
             <Timer className="h-4 w-4 text-primary" />

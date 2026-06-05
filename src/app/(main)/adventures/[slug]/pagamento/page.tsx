@@ -48,19 +48,24 @@ export default function PagamentoPage() {
 
   // Fetch PIX config
   const [pixConfig, setPixConfig] = useState<PixConfig | null>(null);
+  const [lotePixCopiaECola, setLotePixCopiaECola] = useState("");
   const [isLoadingPixConfig, setIsLoadingPixConfig] = useState(true);
 
   useEffect(() => {
+    if (!slug) {
+      setIsLoadingPixConfig(false);
+      return;
+    }
     supabase
-      .from('content')
-      .select('data')
-      .eq('id', 'pix')
+      .from('adventures')
+      .select('pix_config')
+      .eq('slug', slug)
       .single()
       .then(({ data }) => {
-        setPixConfig(normalizePixConfig(data?.data));
+        setPixConfig(normalizePixConfig(data?.pix_config));
         setIsLoadingPixConfig(false);
       });
-  }, [supabase]);
+  }, [supabase, slug]);
 
   // Check if already confirmed
   useEffect(() => {
@@ -69,13 +74,31 @@ export default function PagamentoPage() {
     }
   }, [registration]);
 
+  useEffect(() => {
+    if (!registration?.lote_id) {
+      setLotePixCopiaECola("");
+      return;
+    }
+    supabase
+      .from("adventure_lotes")
+      .select("pix_copia_cola")
+      .eq("id", registration.lote_id)
+      .single()
+      .then(({ data }) => {
+        setLotePixCopiaECola(data?.pix_copia_cola ?? "");
+      });
+  }, [supabase, registration?.lote_id]);
+
   const groupSizeSlot =
     registration && registration.group_size >= 1 && registration.group_size <= 4
       ? (registration.group_size as 1 | 2 | 3 | 4)
       : null;
 
-  const pixCopiaECola =
-    pixConfig && groupSizeSlot ? pixConfig.pixCopiaECola[groupSizeSlot] : "";
+  const pixCopiaECola = registration?.lote_id
+    ? lotePixCopiaECola
+    : pixConfig && groupSizeSlot
+      ? pixConfig.pixCopiaECola[groupSizeSlot]
+      : "";
 
   // Generate QR Code when PIX copia-e-cola changes
   useEffect(() => {

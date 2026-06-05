@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,10 +28,38 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useCollection } from "@/supabase/use-collection";
-import type { Adventure } from "@/lib/types";
+import { useSupabase } from "@/supabase/hooks";
+import type { ActiveLote, Adventure } from "@/lib/types";
 
 export default function AdventuresPage() {
+  const supabase = useSupabase();
   const { data: adventures, isLoading } = useCollection<Adventure>('adventures');
+  const [priceByAdventureId, setPriceByAdventureId] = useState<Record<string, number | null>>({});
+
+  useEffect(() => {
+    if (!adventures?.length) return;
+    let cancelled = false;
+
+    async function loadPrices() {
+      const list = adventures ?? [];
+      const entries = await Promise.all(
+        list.map(async (adv) => {
+          if (!adv.has_lotes) return [adv.id, adv.price] as const;
+          const { data } = await supabase.rpc('get_active_lote', { p_adventure_id: adv.id });
+          const lote = data?.[0] as ActiveLote | undefined;
+          return [adv.id, lote ? Number(lote.price) : null] as const;
+        })
+      );
+      if (!cancelled) {
+        setPriceByAdventureId(Object.fromEntries(entries));
+      }
+    }
+
+    void loadPrices();
+    return () => {
+      cancelled = true;
+    };
+  }, [adventures, supabase]);
 
   return (
     <Card>
@@ -81,7 +110,15 @@ export default function AdventuresPage() {
                       {adventure.registrations_enabled ? "Abertas" : "Fechadas"}
                     </Badge>
                   </TableCell>
-                  <TableCell>R${adventure.price.toFixed(2)}</TableCell>
+                  <TableCell>
+                    {adventure.has_lotes
+                      ? priceByAdventureId[adventure.id] === null
+                        ? "Esgotado"
+                        : priceByAdventureId[adventure.id] !== undefined
+                          ? `R$${priceByAdventureId[adventure.id]!.toFixed(2)}`
+                          : "—"
+                      : `R$${adventure.price.toFixed(2)}`}
+                  </TableCell>
                   <TableCell>{adventure.location}</TableCell>
                   <TableCell>
                     <DropdownMenu>
