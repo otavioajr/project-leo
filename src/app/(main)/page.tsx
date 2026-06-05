@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AdventureCard } from '@/components/adventure-card';
 import { ArrowRight, Mountain } from 'lucide-react';
 import { useCollection } from '@/supabase/use-collection';
+import { useSupabase } from '@/supabase/hooks';
+import type { ActiveLote } from '@/lib/types';
 import { useDoc } from '@/supabase/use-doc';
 import type { Adventure, HomePageContent } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -50,15 +52,42 @@ function EmptyState() {
 }
 
 export default function Home() {
+  const supabase = useSupabase();
   const { data: adventures, isLoading: isLoadingAdventures } = useCollection<Adventure>('adventures');
   const { data: homePageDoc, isLoading: isLoadingContent } = useDoc<{ data: HomePageContent }>('content', 'homepage');
   const homePageContent = homePageDoc?.data ?? null;
   const { setTransparent } = useHeaderTransparent();
+  const [priceByAdventureId, setPriceByAdventureId] = useState<Record<string, number | null>>({});
 
   useEffect(() => {
     setTransparent(true);
     return () => setTransparent(false);
   }, [setTransparent]);
+
+  useEffect(() => {
+    if (!adventures?.length) return;
+    let cancelled = false;
+
+    async function loadPrices() {
+      const list = adventures ?? [];
+      const entries = await Promise.all(
+        list.map(async (adv) => {
+          if (!adv.has_lotes) return [adv.id, adv.price] as const;
+          const { data } = await supabase.rpc('get_active_lote', { p_adventure_id: adv.id });
+          const lote = data?.[0] as ActiveLote | undefined;
+          return [adv.id, lote ? Number(lote.price) : null] as const;
+        })
+      );
+      if (!cancelled) {
+        setPriceByAdventureId(Object.fromEntries(entries));
+      }
+    }
+
+    void loadPrices();
+    return () => {
+      cancelled = true;
+    };
+  }, [adventures, supabase]);
 
   if (isLoadingContent || !homePageContent) {
     return (
@@ -128,7 +157,13 @@ export default function Home() {
           {adventures && adventures.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {adventures.map((adventure) => (
-                <AdventureCard key={adventure.id} adventure={adventure} />
+                <AdventureCard
+                  key={adventure.id}
+                  adventure={adventure}
+                  displayPrice={
+                    adventure.has_lotes ? priceByAdventureId[adventure.id] : undefined
+                  }
+                />
               ))}
             </div>
           )}

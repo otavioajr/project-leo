@@ -36,6 +36,7 @@ import {
   deriveLegacyContactFields,
   deriveParticipantDisplayName,
 } from "@/lib/registration-contact";
+import { TshirtSizeField } from "./tshirt-size-field";
 
 type SimpleCustomFieldType = "text" | "email" | "tel" | "number";
 type SimpleCustomField = CustomField & { type: SimpleCustomFieldType };
@@ -49,6 +50,14 @@ function isSimpleCustomField(field: CustomField): field is SimpleCustomField {
     field.type === "tel" ||
     field.type === "number"
   );
+}
+
+function isTshirtSizeField(field: CustomField): field is CustomField & { type: "tshirt_size" } {
+  return field.type === "tshirt_size";
+}
+
+function isParticipantCustomField(field: CustomField): boolean {
+  return isSimpleCustomField(field) || isTshirtSizeField(field);
 }
 
 function isRequiredCustomValueFilled(
@@ -77,15 +86,21 @@ const participantSchema = z
 
 const PIX_MAX_GROUP_SIZE = 4;
 
-function createRegistrationSchema(remainingSpots: number | null, hasBaterias: boolean) {
-  let groupSizeSchema = z
-    .coerce.number()
-    .int("Use um número inteiro.")
-    .min(1, "O grupo deve ter pelo menos 1 pessoa.")
-    .max(PIX_MAX_GROUP_SIZE, `O grupo pode ter no máximo ${PIX_MAX_GROUP_SIZE} pessoas.`);
+function createRegistrationSchema(
+  remainingSpots: number | null,
+  hasBaterias: boolean,
+  hasLotes: boolean
+) {
+  let groupSizeSchema: z.ZodType<number> = hasLotes
+    ? z.literal(1)
+    : z
+        .coerce.number()
+        .int("Use um número inteiro.")
+        .min(1, "O grupo deve ter pelo menos 1 pessoa.")
+        .max(PIX_MAX_GROUP_SIZE, `O grupo pode ter no máximo ${PIX_MAX_GROUP_SIZE} pessoas.`);
 
-  if (remainingSpots !== null) {
-    groupSizeSchema = groupSizeSchema.max(
+  if (!hasLotes && remainingSpots !== null) {
+    groupSizeSchema = (groupSizeSchema as z.ZodNumber).max(
       remainingSpots,
       `Restam apenas ${remainingSpots} ${remainingSpots === 1 ? "vaga" : "vagas"} para esta aventura.`
     );
@@ -129,6 +144,7 @@ type RegistrationFormProps = {
   customFields?: CustomField[];
   remainingSpots: number | null;
   baterias: BateriaAvailability[] | null;
+  hasLotes?: boolean;
 };
 
 type RegistrationRpcErrorId =
@@ -139,6 +155,8 @@ type RegistrationRpcErrorId =
   | "BATERIA_ASSIGNMENTS_MISMATCH"
   | "BATERIA_NOT_FOUND"
   | "BATERIA_CAPACITY_EXCEEDED"
+  | "NO_ACTIVE_LOTE"
+  | "LOTE_CAPACITY_EXCEEDED"
   | "UNKNOWN";
 
 function getErrorString(value: unknown) {
@@ -196,6 +214,14 @@ function normalizeRegistrationRpcError(error: unknown): RegistrationRpcErrorId {
     return "BATERIA_NOT_FOUND";
   }
 
+  if (matchesIdentifier("NO_ACTIVE_LOTE")) {
+    return "NO_ACTIVE_LOTE";
+  }
+
+  if (matchesIdentifier("LOTE_CAPACITY_EXCEEDED")) {
+    return "LOTE_CAPACITY_EXCEEDED";
+  }
+
   return "UNKNOWN";
 }
 
@@ -205,6 +231,7 @@ export function RegistrationForm({
   customFields,
   remainingSpots,
   baterias,
+  hasLotes = false,
 }: RegistrationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -257,7 +284,7 @@ export function RegistrationForm({
   }, [adventureId, hasBaterias, supabase]);
 
   const allCustomFields = customFields ?? [];
-  const participantCustomFields = allCustomFields.filter(isSimpleCustomField);
+  const participantCustomFields = allCustomFields.filter(isParticipantCustomField);
 
   const initialCustomData: RegistrationCustomData = {};
   allCustomFields.forEach((field) => {
@@ -265,7 +292,7 @@ export function RegistrationForm({
   });
 
   const form = useForm<RegistrationFormValues>({
-    resolver: zodResolver(createRegistrationSchema(remainingSpots, hasBaterias)),
+    resolver: zodResolver(createRegistrationSchema(remainingSpots, hasBaterias, hasLotes)),
     defaultValues: {
       groupSize: 1,
       customData: initialCustomData,
@@ -282,16 +309,18 @@ export function RegistrationForm({
   const groupSize = form.watch("groupSize");
 
   useEffect(() => {
+    if (hasLotes) return;
     if (remainingSpots !== null && remainingSpots > 0 && groupSize > remainingSpots) {
       form.setValue("groupSize", remainingSpots);
     }
-  }, [form, groupSize, remainingSpots]);
+  }, [form, groupSize, remainingSpots, hasLotes]);
 
   useEffect(() => {
+    if (hasLotes) return;
     const desiredParticipantCount = Math.max(0, groupSize - 1);
     const currentParticipantCount = fields.length;
     const additionalParticipantFields = (customFields ?? []).filter(
-      isSimpleCustomField
+      isParticipantCustomField
     );
 
     if (desiredParticipantCount > currentParticipantCount) {
@@ -314,7 +343,7 @@ export function RegistrationForm({
         )
       );
     }
-  }, [groupSize, fields.length, append, remove, customFields]);
+  }, [groupSize, fields.length, append, remove, customFields, hasLotes]);
 
   async function onSubmit(values: RegistrationFormValues) {
     setIsSubmitting(true);
@@ -494,6 +523,24 @@ export function RegistrationForm({
         return;
       }
 
+      if (rpcErrorId === "NO_ACTIVE_LOTE") {
+        toast({
+          title: "Lotes esgotados",
+          description: "Todos os lotes estão esgotados no momento.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (rpcErrorId === "LOTE_CAPACITY_EXCEEDED") {
+        toast({
+          title: "Vagas esgotadas",
+          description: "As vagas deste lote acabaram de ser preenchidas. Tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({
         title: "Falha na Inscrição",
         description: "Algo deu errado. Por favor, tente novamente.",
@@ -574,32 +621,35 @@ export function RegistrationForm({
             </ul>
           </div>
         )}
-        <FormField
-          control={form.control}
-          name="groupSize"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Tamanho do Grupo</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  min="1"
-                  max={remainingSpots ?? undefined}
-                  placeholder="1"
-                  {...field}
-                />
-              </FormControl>
-              {remainingSpots !== null && (
-                <p className="text-sm text-muted-foreground">
-                  Restam {remainingSpots} {remainingSpots === 1 ? "vaga" : "vagas"} reservadas no momento.
-                </p>
+        {!hasLotes ? (
+          <>
+            <FormField
+              control={form.control}
+              name="groupSize"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tamanho do Grupo</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min="1"
+                      max={remainingSpots ?? undefined}
+                      placeholder="1"
+                      {...field}
+                    />
+                  </FormControl>
+                  {remainingSpots !== null && (
+                    <p className="text-sm text-muted-foreground">
+                      Restam {remainingSpots} {remainingSpots === 1 ? "vaga" : "vagas"} reservadas no momento.
+                    </p>
+                  )}
+                  <FormMessage />
+                </FormItem>
               )}
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <Separator />
+            />
+            <Separator />
+          </>
+        ) : null}
 
         {allCustomFields.length > 0 ? (
           <h3 className="text-lg font-medium">Informações da inscrição</h3>
@@ -651,6 +701,24 @@ export function RegistrationForm({
                   {customField.required && <span className="text-destructive">*</span>}
                 </>
               );
+
+              if (customField.type === "tshirt_size") {
+                const options = customField.options ?? [];
+                const selectValue = typeof field.value === "string" ? field.value : "";
+
+                return (
+                  <TshirtSizeField
+                    label={customField.label}
+                    required={customField.required}
+                    options={options}
+                    helpImageUrl={customField.helpImageUrl}
+                    value={selectValue}
+                    onChange={field.onChange}
+                    name={field.name}
+                    onBlur={field.onBlur}
+                  />
+                );
+              }
 
               if (customField.type === "select") {
                 const options = customField.options ?? [];
@@ -735,9 +803,9 @@ export function RegistrationForm({
           />
         ))}
 
-        {fields.length > 0 && <Separator />}
+        {!hasLotes && fields.length > 0 && <Separator />}
 
-        {fields.map((participantField, index) => (
+        {!hasLotes && fields.map((participantField, index) => (
           <div
             key={participantField.id}
             className="space-y-4 border-l-4 border-secondary pl-4 py-4"
@@ -779,22 +847,40 @@ export function RegistrationForm({
                 key={customField.name}
                 control={form.control}
                 name={`participants.${index}.${customField.name}`}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      {customField.label}
-                      {customField.required && <span className="text-destructive">*</span>}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder={customField.label}
-                        type={customField.type}
-                        {...field}
+                render={({ field }) => {
+                  if (customField.type === "tshirt_size") {
+                    const options = customField.options ?? [];
+                    return (
+                      <TshirtSizeField
+                        label={customField.label}
+                        required={customField.required}
+                        options={options}
+                        helpImageUrl={customField.helpImageUrl}
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        name={field.name}
+                        onBlur={field.onBlur}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                    );
+                  }
+
+                  return (
+                    <FormItem>
+                      <FormLabel>
+                        {customField.label}
+                        {customField.required && <span className="text-destructive">*</span>}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder={customField.label}
+                          type={customField.type}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
             ))}
           </div>

@@ -6,7 +6,7 @@ import { DollarSign, Timer, BarChart, MapPin, Info, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RegistrationForm } from './_components/registration-form';
 import { useSupabase } from '@/supabase/hooks';
-import type { Adventure, BateriaAvailability } from '@/lib/types';
+import type { ActiveLote, Adventure, BateriaAvailability } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect } from 'react';
 import { useHeaderTransparent } from '@/components/layout/header-context';
@@ -16,6 +16,7 @@ function useFetchAdventure(slug: string) {
   const [adventure, setAdventure] = useState<Adventure | null>(null);
   const [reservedParticipants, setReservedParticipants] = useState(0);
   const [baterias, setBaterias] = useState<BateriaAvailability[] | null>(null);
+  const [activeLote, setActiveLote] = useState<ActiveLote | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -26,6 +27,7 @@ function useFetchAdventure(slug: string) {
       setAdventure(null);
       setReservedParticipants(0);
       setBaterias(null);
+      setActiveLote(null);
       setError(null);
       setIsLoading(false);
       return;
@@ -34,6 +36,7 @@ function useFetchAdventure(slug: string) {
     setAdventure(null);
     setReservedParticipants(0);
     setBaterias(null);
+    setActiveLote(null);
     setError(null);
     setIsLoading(true);
 
@@ -41,7 +44,7 @@ function useFetchAdventure(slug: string) {
       const { data, error: fetchError } = await supabase
         .from('adventures')
         .select(
-          'id, slug, title, description, long_description, max_participants, price, duration, location, difficulty, image_url, image_description, registrations_enabled, has_baterias, custom_fields, created_at'
+          'id, slug, title, description, long_description, max_participants, price, duration, location, difficulty, image_url, image_description, registrations_enabled, has_baterias, has_lotes, custom_fields, created_at'
         )
         .eq('slug', slug)
         .maybeSingle();
@@ -62,7 +65,18 @@ function useFetchAdventure(slug: string) {
       const typedAdventure = data as Adventure;
       setAdventure(typedAdventure);
 
-      if (typedAdventure.has_baterias) {
+      if (typedAdventure.has_lotes) {
+        const { data: loteData, error: loteError } = await supabase
+          .rpc('get_active_lote', { p_adventure_id: typedAdventure.id });
+        if (cancelled) return;
+        if (loteError) {
+          setError(new Error(loteError.message));
+        } else if (loteData && loteData.length > 0) {
+          setActiveLote(loteData[0] as ActiveLote);
+        } else {
+          setActiveLote(null);
+        }
+      } else if (typedAdventure.has_baterias) {
         const { data: bateriasData, error: bateriasError } = await supabase
           .rpc('get_adventure_baterias_with_availability', {
             p_adventure_id: typedAdventure.id,
@@ -94,13 +108,13 @@ function useFetchAdventure(slug: string) {
     };
   }, [supabase, slug]);
 
-  return { adventure, reservedParticipants, baterias, isLoading, error };
+  return { adventure, reservedParticipants, baterias, activeLote, isLoading, error };
 }
 
 export default function AdventurePage() {
   const params = useParams();
   const slug = params.slug as string;
-  const { adventure, reservedParticipants, baterias, isLoading, error } = useFetchAdventure(slug);
+  const { adventure, reservedParticipants, baterias, activeLote, isLoading, error } = useFetchAdventure(slug);
   const { setTransparent } = useHeaderTransparent();
 
   useEffect(() => {
@@ -144,16 +158,22 @@ export default function AdventurePage() {
   }
 
   const usesBaterias = adventure.has_baterias === true;
+  const usesLotes = adventure.has_lotes === true;
+  const displayPrice = usesLotes ? (activeLote?.price ?? adventure.price) : adventure.price;
 
-  const remainingSpots = usesBaterias
-    ? (baterias
-        ? baterias.reduce((sum, b) => sum + Math.max(b.capacity - b.reserved, 0), 0)
-        : null)
-    : adventure.max_participants === null
-      ? null
-      : Math.max(adventure.max_participants - reservedParticipants, 0);
+  const remainingSpots = usesLotes
+    ? (activeLote?.remaining ?? 0)
+    : usesBaterias
+      ? (baterias
+          ? baterias.reduce((sum, b) => sum + Math.max(b.capacity - b.reserved, 0), 0)
+          : null)
+      : adventure.max_participants === null
+        ? null
+        : Math.max(adventure.max_participants - reservedParticipants, 0);
 
-  const isSoldOut = remainingSpots !== null && remainingSpots <= 0;
+  const isSoldOut = usesLotes
+    ? activeLote === null || activeLote.remaining <= 0
+    : remainingSpots !== null && remainingSpots <= 0;
 
   return (
     <div>
@@ -185,7 +205,22 @@ export default function AdventurePage() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
           <div className="lg:col-span-3">
             <p className="text-lg leading-relaxed text-muted-foreground mb-6">{adventure.description}</p>
-            {usesBaterias && baterias && baterias.length > 0 ? (
+            {usesLotes && activeLote ? (
+              <div className="mb-6 flex items-center gap-3 rounded-2xl border bg-muted/40 px-4 py-3">
+                <div className="rounded-full bg-primary/10 p-2">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">
+                    {activeLote.label} — Restam {activeLote.remaining}{" "}
+                    {activeLote.remaining === 1 ? "vaga" : "vagas"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Preço atual: R${Number(activeLote.price).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            ) : usesBaterias && baterias && baterias.length > 0 ? (
               <div className="mb-6 rounded-2xl border bg-muted/40 px-4 py-3">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="rounded-full bg-primary/10 p-2">
@@ -247,7 +282,7 @@ export default function AdventurePage() {
                       <DollarSign className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <span className="text-3xl font-bold text-primary">R${adventure.price.toFixed(2)}</span>
+                      <span className="text-3xl font-bold text-primary">R${Number(displayPrice).toFixed(2)}</span>
                       <span className="text-sm text-muted-foreground ml-1">por pessoa</span>
                     </div>
                   </div>
@@ -296,10 +331,11 @@ export default function AdventurePage() {
                       adventureId={adventure.id}
                       adventureTitle={adventure.title}
                       adventureSlug={adventure.slug}
-                      adventurePrice={adventure.price}
+                      adventurePrice={displayPrice}
                       customFields={adventure.custom_fields}
                       remainingSpots={remainingSpots}
                       baterias={usesBaterias ? baterias : null}
+                      hasLotes={usesLotes}
                     />
                   </CardContent>
                 </Card>
