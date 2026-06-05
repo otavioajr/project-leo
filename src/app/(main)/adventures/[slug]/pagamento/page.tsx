@@ -51,16 +51,20 @@ export default function PagamentoPage() {
   const [isLoadingPixConfig, setIsLoadingPixConfig] = useState(true);
 
   useEffect(() => {
+    if (!slug) {
+      setIsLoadingPixConfig(false);
+      return;
+    }
     supabase
-      .from('content')
-      .select('data')
-      .eq('id', 'pix')
+      .from('adventures')
+      .select('pix_config')
+      .eq('slug', slug)
       .single()
       .then(({ data }) => {
-        setPixConfig(normalizePixConfig(data?.data));
+        setPixConfig(normalizePixConfig(data?.pix_config));
         setIsLoadingPixConfig(false);
       });
-  }, [supabase]);
+  }, [supabase, slug]);
 
   // Check if already confirmed
   useEffect(() => {

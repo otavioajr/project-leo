@@ -45,17 +45,13 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { User, Mail, Phone, Users, LoaderCircle, CheckCircle2, Clock, AlertCircle, DollarSign, MoreHorizontal, Trash2 } from "lucide-react";
+import { User, Users, LoaderCircle, CheckCircle2, Clock, AlertCircle, DollarSign, MoreHorizontal, Trash2 } from "lucide-react";
+import { formatCustomDataEntries } from "@/lib/registration-contact";
 import { useCollection } from "@/supabase/use-collection";
 import { useSupabase } from "@/supabase/hooks";
 import type { Adventure, Registration, PaymentStatus, Bateria } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { exportRegistrationsToXlsx } from "./_lib/export-registrations";
-
-function formatFieldName(name: string) {
-    const words = name.replace(/_/g, ' ').split(' ');
-    return words.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -339,32 +335,55 @@ export default function RegistrationsPage() {
                         Grupo de {reg.group_size}
                     </div>
                     <ul className="pl-6 mt-1 space-y-2 text-sm text-muted-foreground">
-                        <li className="flex items-center gap-2 font-semibold text-foreground"><User className="h-4 w-4" />{reg.name} <span className="text-xs text-muted-foreground">(Contato)</span></li>
+                        <li className="border-l pl-3 ml-2 py-1">
+                          <div className="flex items-center gap-2 font-semibold text-foreground">
+                            <User className="h-4 w-4" />
+                            Contato principal
+                          </div>
+                          <div className="pl-6 mt-1 space-y-1">
+                            {formatCustomDataEntries(reg.custom_data).length > 0 ? (
+                              formatCustomDataEntries(reg.custom_data).map((entry) => (
+                                <div key={entry.label} className="text-xs">
+                                  <span className="font-medium">{entry.label}:</span> {entry.value}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-xs text-muted-foreground">Sem dados adicionais</div>
+                            )}
+                          </div>
+                        </li>
                         {reg.participants?.map((p, i) => (
                            <li key={i} className="border-l pl-3 ml-2 py-1">
-                                <div className="flex items-center gap-2 font-semibold text-foreground"><User className="h-4 w-4 opacity-70" />{p.name}</div>
+                                <div className="flex items-center gap-2 font-semibold text-foreground">
+                                  <User className="h-4 w-4 opacity-70" />
+                                  Participante {i + 2}
+                                </div>
                                 <div className="pl-6 mt-1 space-y-1">
-                                    {Object.entries(p).map(([key, value]) => {
-                                        if (key === 'name' || !value) return null;
-                                        return (
-                                            <div key={key} className="text-xs">
-                                                <span className="font-medium">{formatFieldName(key)}:</span> {value}
-                                            </div>
-                                        )
-                                    })}
+                                    {formatCustomDataEntries(p, { excludeKeys: ["name"] }).length > 0 ? (
+                                      formatCustomDataEntries(p, { excludeKeys: ["name"] }).map((entry) => (
+                                        <div key={entry.label} className="text-xs">
+                                          <span className="font-medium">{entry.label}:</span> {entry.value}
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="text-xs text-muted-foreground">Sem dados adicionais</div>
+                                    )}
                                 </div>
                             </li>
                         ))}
                     </ul>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <a href={`mailto:${reg.email}`} className="text-sm text-muted-foreground hover:text-primary flex items-center gap-2">
-                        <Mail className="h-4 w-4" />{reg.email}
-                      </a>
-                      <a href={`tel:${reg.phone}`} className="text-sm text-muted-foreground hover:text-primary flex items-center gap-2">
-                        <Phone className="h-4 w-4" />{reg.phone}
-                      </a>
+                    <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                      {formatCustomDataEntries(reg.custom_data).length > 0 ? (
+                        formatCustomDataEntries(reg.custom_data).map((entry) => (
+                          <div key={entry.label}>
+                            <span className="font-medium text-foreground">{entry.label}:</span> {entry.value}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-xs">—</span>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-sm">{summarizeBaterias(reg)}</TableCell>

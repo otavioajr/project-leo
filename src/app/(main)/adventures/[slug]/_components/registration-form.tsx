@@ -32,6 +32,10 @@ import type {
   RegistrationCustomValue,
 } from "@/lib/types";
 import { useSupabase } from "@/supabase/hooks";
+import {
+  deriveLegacyContactFields,
+  deriveParticipantDisplayName,
+} from "@/lib/registration-contact";
 
 type SimpleCustomFieldType = "text" | "email" | "tel" | "number";
 type SimpleCustomField = CustomField & { type: SimpleCustomFieldType };
@@ -67,7 +71,6 @@ function isRequiredCustomValueFilled(
 
 const participantSchema = z
   .object({
-    name: z.string().min(2, "O nome do participante é obrigatório."),
     bateriaId: z.string().optional(),
   })
   .catchall(z.string());
@@ -90,9 +93,6 @@ function createRegistrationSchema(remainingSpots: number | null, hasBaterias: bo
 
   return z
     .object({
-      name: z.string().min(2, "O nome do contato deve ter pelo menos 2 caracteres."),
-      email: z.string().email("Por favor, insira um endereço de e-mail válido."),
-      phone: z.string().min(10, "Por favor, insira um número de telefone válido."),
       groupSize: groupSizeSchema,
       customData: z.record(customDataValueSchema).optional(),
       participants: z.array(participantSchema),
@@ -267,9 +267,6 @@ export function RegistrationForm({
   const form = useForm<RegistrationFormValues>({
     resolver: zodResolver(createRegistrationSchema(remainingSpots, hasBaterias)),
     defaultValues: {
-      name: "",
-      email: "",
-      phone: "",
       groupSize: 1,
       customData: initialCustomData,
       participants: [],
@@ -298,10 +295,9 @@ export function RegistrationForm({
     );
 
     if (desiredParticipantCount > currentParticipantCount) {
-      const newFields: { name: string; bateriaId: string; [key: string]: string }[] = [];
+      const newFields: { bateriaId: string; [key: string]: string }[] = [];
       for (let i = 0; i < desiredParticipantCount - currentParticipantCount; i++) {
-        const newParticipant: { name: string; bateriaId: string; [key: string]: string } = {
-          name: "",
+        const newParticipant: { bateriaId: string; [key: string]: string } = {
           bateriaId: "",
         };
         additionalParticipantFields.forEach((field) => {
@@ -376,17 +372,22 @@ export function RegistrationForm({
           typeof customValue === "string" ? customValue : "";
       });
 
+      const contactFields = deriveLegacyContactFields(allCustomFields, customDataPayload);
+
       const participantsPayload: Record<string, string>[] = values.participants.map(
         (participant) => {
-          const participantPayload: Record<string, string> = {
-            name: participant.name,
-          };
+          const participantPayload: Record<string, string> = {};
 
           participantCustomFields.forEach((field) => {
             const participantValue = participant[field.name];
             participantPayload[field.name] =
               typeof participantValue === "string" ? participantValue : "";
           });
+
+          participantPayload.name = deriveParticipantDisplayName(
+            participantCustomFields,
+            participantPayload
+          );
 
           return participantPayload;
         }
@@ -403,9 +404,9 @@ export function RegistrationForm({
         "create_registration_with_capacity",
         {
           p_adventure_id: adventureId,
-          p_name: values.name,
-          p_email: values.email,
-          p_phone: values.phone,
+          p_name: contactFields.name,
+          p_email: contactFields.email,
+          p_phone: contactFields.phone,
           p_group_size: values.groupSize,
           p_participants: participantsPayload,
           p_custom_data: customDataPayload,
@@ -600,46 +601,13 @@ export function RegistrationForm({
 
         <Separator />
 
-        <h3 className="text-lg font-medium">Dados do Contato Principal</h3>
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nome Completo</FormLabel>
-              <FormControl>
-                <Input placeholder="Nome Completo" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Endereço de E-mail</FormLabel>
-              <FormControl>
-                <Input placeholder="voce@exemplo.com" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Telefone</FormLabel>
-              <FormControl>
-                <Input placeholder="(99) 99999-9999" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {allCustomFields.length > 0 ? (
+          <h3 className="text-lg font-medium">Informações da inscrição</h3>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Nenhum campo adicional configurado para esta aventura.
+          </p>
+        )}
         {hasBaterias && bateriasState && (
           <FormField
             control={form.control}
@@ -775,19 +743,6 @@ export function RegistrationForm({
             className="space-y-4 border-l-4 border-secondary pl-4 py-4"
           >
             <h3 className="text-lg font-medium">Dados do Participante {index + 2}</h3>
-            <FormField
-              control={form.control}
-              name={`participants.${index}.name`}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome Completo</FormLabel>
-                  <FormControl>
-                    <Input placeholder={`Nome do participante ${index + 2}`} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             {hasBaterias && bateriasState && (
               <FormField
                 control={form.control}

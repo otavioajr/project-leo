@@ -46,12 +46,13 @@ export type Adventure = {
   price: number;
   duration: string;
   location: string;
-  difficulty: 'Fácil' | 'Moderado' | 'Desafiador';
+  difficulty: string | null;
   image_url: string;
   image_description: string;
   registrations_enabled: boolean;
   has_baterias: boolean;
   custom_fields?: CustomField[];
+  pix_config?: PixConfig | null;
   created_at: string;
 };
 

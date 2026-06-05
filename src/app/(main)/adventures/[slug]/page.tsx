@@ -2,7 +2,6 @@
 
 import { notFound, useParams } from 'next/navigation';
 import Image from 'next/image';
-import { Badge } from '@/components/ui/badge';
 import { DollarSign, Timer, BarChart, MapPin, Info, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RegistrationForm } from './_components/registration-form';
@@ -41,7 +40,9 @@ function useFetchAdventure(slug: string) {
     async function loadAdventure() {
       const { data, error: fetchError } = await supabase
         .from('adventures')
-        .select()
+        .select(
+          'id, slug, title, description, long_description, max_participants, price, duration, location, difficulty, image_url, image_description, registrations_enabled, has_baterias, custom_fields, created_at'
+        )
         .eq('slug', slug)
         .maybeSingle();
 
@@ -142,11 +143,6 @@ export default function AdventurePage() {
     return notFound();
   }
 
-  const difficultyVariant = {
-    'Fácil': 'default',
-    'Moderado': 'secondary',
-    'Desafiador': 'destructive',
-  } as const;
   const usesBaterias = adventure.has_baterias === true;
 
   const remainingSpots = usesBaterias
@@ -267,14 +263,16 @@ export default function AdventurePage() {
                     </div>
                     <span>{adventure.location}</span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="bg-primary/10 rounded-full p-2">
-                      <BarChart className="h-5 w-5 text-primary" />
+                  {adventure.difficulty?.trim() ? (
+                    <div className="flex items-center gap-3">
+                      <div className="bg-primary/10 rounded-full p-2">
+                        <BarChart className="h-5 w-5 text-primary" />
+                      </div>
+                      <span className="inline-flex items-center rounded-full border border-border bg-muted px-3 py-1 text-sm font-medium text-foreground">
+                        {adventure.difficulty.trim()}
+                      </span>
                     </div>
-                    <Badge variant={difficultyVariant[adventure.difficulty]}>
-                      {adventure.difficulty}
-                    </Badge>
-                  </div>
+                  ) : null}
                   {remainingSpots !== null && (
                     <div className="flex items-center gap-3">
                       <div className="bg-primary/10 rounded-full p-2">

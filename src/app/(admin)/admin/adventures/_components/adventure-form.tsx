@@ -1,13 +1,15 @@
 "use client";
 
 import { z } from "zod";
-import { useForm, useFieldArray, type FieldErrors } from "react-hook-form";
+import { useForm, useFieldArray, Controller, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { Adventure, BateriaAvailability } from "@/lib/types";
 import { useSupabase } from "@/supabase/hooks";
+import { normalizePixConfig } from "@/lib/pix-config";
+import { PixSlotCard } from "./pix-slot-card";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -166,13 +168,23 @@ const adventureSchema = z
     price: z.coerce.number().min(0, "O preco deve ser um numero positivo."),
     duration: z.string().min(1, "A duracao e obrigatoria."),
     location: z.string(),
-    difficulty: z.enum(["Fácil", "Moderado", "Desafiador"]),
+    difficulty: z
+      .string()
+      .max(500, "A dificuldade deve ter no máximo 500 caracteres."),
     imageUrl: z.union([z.literal(""), z.string().url("URL da imagem invalida.")]),
     imageDescription: z.string(),
     registrationsEnabled: z.boolean(),
     hasBaterias: z.boolean(),
     baterias: z.array(bateriaSchema).optional(),
     customFields: z.array(customFieldSchema).optional(),
+    pixEnabled: z.boolean(),
+    pixCopiaECola: z.object({
+      1: z.string(),
+      2: z.string(),
+      3: z.string(),
+      4: z.string(),
+    }),
+    pixInstructions: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.hasBaterias && (!data.baterias || data.baterias.length === 0)) {
@@ -180,6 +192,16 @@ const adventureSchema = z
         code: z.ZodIssueCode.custom,
         message: "Adicione pelo menos uma bateria.",
         path: ["baterias"],
+      });
+    }
+    if (
+      data.pixEnabled &&
+      !Object.values(data.pixCopiaECola).some((s) => s.trim().length > 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Cadastre ao menos uma chave PIX para ativar o pagamento.",
+        path: ["pixEnabled"],
       });
     }
   });
@@ -246,6 +268,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
     });
   }
   const supabase = useSupabase();
+  const pix = normalizePixConfig(adventure?.pix_config);
 
   const form = useForm<AdventureFormValues>({
     resolver: zodResolver(adventureSchema),
@@ -257,7 +280,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       price: adventure?.price || 0,
       duration: adventure?.duration || "",
       location: adventure?.location || "",
-      difficulty: adventure?.difficulty || "Moderado",
+      difficulty: adventure?.difficulty ?? "",
       imageUrl: adventure?.image_url || "",
       imageDescription: adventure?.image_description || "",
       registrationsEnabled: adventure?.registrations_enabled ?? true,
@@ -274,6 +297,9 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
         const { options: _options, ...simpleField } = customField;
         return simpleField;
       }),
+      pixEnabled: pix.pixEnabled,
+      pixCopiaECola: pix.pixCopiaECola,
+      pixInstructions: pix.instructions ?? "",
     },
   });
 
@@ -403,11 +429,17 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       price: values.price,
       duration: values.duration,
       location: values.location,
-      difficulty: values.difficulty,
+      difficulty:
+        values.difficulty.trim() === "" ? null : values.difficulty.trim(),
       image_url: values.imageUrl,
       image_description: values.imageDescription,
       registrations_enabled: values.registrationsEnabled,
       custom_fields: normalizedCustomFields,
+      pix_config: {
+        pixEnabled: values.pixEnabled,
+        pixCopiaECola: values.pixCopiaECola,
+        instructions: values.pixInstructions,
+      },
       // NOTE: has_baterias é atualizado via RPC save_adventure_baterias para
       // garantir atomicidade com o conjunto de baterias.
     };
@@ -674,18 +706,16 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Dificuldade</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a dificuldade" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Fácil">Fácil</SelectItem>
-                      <SelectItem value="Moderado">Moderado</SelectItem>
-                      <SelectItem value="Desafiador">Desafiador</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <Input
+                      placeholder="ex: Aberto para todos, Difícil com possibilidade para iniciantes"
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Opcional. Deixe em branco para não exibir no site.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -884,6 +914,76 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
             />
           </div>
         )}
+
+        <Separator />
+
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-xl font-headline font-semibold mb-1">Pagamento PIX</h3>
+            <FormDescription>
+              Configure os códigos PIX copia-e-cola desta aventura, um para cada
+              tamanho de grupo. O valor cobrado vem do próprio código copia-e-cola.
+            </FormDescription>
+          </div>
+
+          <FormField
+            control={form.control}
+            name="pixEnabled"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <FormLabel className="text-base">Ativar Pagamento PIX</FormLabel>
+                  <FormDescription>
+                    Quando ativado, os clientes serão direcionados para a página de
+                    pagamento após a inscrição.
+                  </FormDescription>
+                </div>
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="space-y-4">
+            {([1, 2, 3, 4] as const).map((size) => (
+              <Controller
+                key={size}
+                control={form.control}
+                name={`pixCopiaECola.${size}` as unknown as keyof AdventureFormValues}
+                render={({ field }) => (
+                  <PixSlotCard
+                    size={size}
+                    value={(field.value as string) ?? ""}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            ))}
+          </div>
+
+          <FormField
+            control={form.control}
+            name="pixInstructions"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Instruções Adicionais (Opcional)</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Ex: Após realizar o pagamento, aguarde a confirmação por e-mail..."
+                    className="min-h-[80px]"
+                    {...field}
+                  />
+                </FormControl>
+                <FormDescription>
+                  Texto exibido na página de pagamento para orientar o cliente.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <Separator />
 

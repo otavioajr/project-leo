@@ -29,10 +29,11 @@ export function AdventureCard({ adventure }: AdventureCardProps) {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
-        {/* Difficulty badge */}
-        <span className="absolute top-3 right-3 px-3 py-1 text-xs font-semibold text-white bg-white/20 backdrop-blur-sm rounded-full">
-          {adventure.difficulty}
-        </span>
+        {adventure.difficulty?.trim() ? (
+          <span className="absolute top-3 right-3 max-w-[85%] px-3 py-1 text-xs font-semibold text-white bg-white/20 backdrop-blur-sm rounded-full line-clamp-1">
+            {adventure.difficulty.trim()}
+          </span>
+        ) : null}
 
         {/* Title over image */}
         <div className="absolute bottom-0 left-0 right-0 p-4">
