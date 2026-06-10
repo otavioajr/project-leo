@@ -190,6 +190,7 @@ const adventureSchema = z
       .max(500, "A dificuldade deve ter no máximo 500 caracteres."),
     imageUrl: z.union([z.literal(""), z.string().url("URL da imagem invalida.")]),
     imageDescription: z.string(),
+    isEnabled: z.boolean(),
     registrationsEnabled: z.boolean(),
     imageRightsEnabled: z.boolean(),
     hasBaterias: z.boolean(),
@@ -357,6 +358,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       difficulty: adventure?.difficulty ?? "",
       imageUrl: adventure?.image_url || "",
       imageDescription: adventure?.image_description || "",
+      isEnabled: adventure?.is_enabled ?? true,
       registrationsEnabled: adventure?.registrations_enabled ?? true,
       imageRightsEnabled: adventure?.image_rights_enabled ?? false,
       hasBaterias: adventure?.has_baterias ?? false,
@@ -618,6 +620,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
         values.difficulty.trim() === "" ? null : values.difficulty.trim(),
       image_url: values.imageUrl,
       image_description: values.imageDescription,
+      is_enabled: values.isEnabled,
       registrations_enabled: values.registrationsEnabled,
       image_rights_enabled: values.imageRightsEnabled,
       custom_fields: normalizedCustomFields,
@@ -938,6 +941,26 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                     Opcional. Deixe em branco para não exibir no site.
                   </FormDescription>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="isEnabled"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel>Aventura habilitada</FormLabel>
+                    <FormDescription>
+                      Quando desabilitada, a aventura não aparece no site e fica indisponível para visitantes.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />

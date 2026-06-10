@@ -92,7 +92,8 @@ export default function AdventuresPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Título</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Visibilidade</TableHead>
+              <TableHead>Inscrições</TableHead>
               <TableHead>Preço</TableHead>
               <TableHead>Localização</TableHead>
               <TableHead>
@@ -105,6 +106,11 @@ export default function AdventuresPage() {
               adventures.map((adventure) => (
                 <TableRow key={adventure.id}>
                   <TableCell className="font-medium">{adventure.title}</TableCell>
+                  <TableCell>
+                    <Badge variant={adventure.is_enabled ? "default" : "secondary"}>
+                      {adventure.is_enabled ? "Ativa" : "Desabilitada"}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     <Badge variant={adventure.registrations_enabled ? "default" : "outline"}>
                       {adventure.registrations_enabled ? "Abertas" : "Fechadas"}
@@ -143,7 +149,7 @@ export default function AdventuresPage() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="text-center">
+                <TableCell colSpan={6} className="text-center">
                   Nenhuma aventura encontrada.
                 </TableCell>
               </TableRow>

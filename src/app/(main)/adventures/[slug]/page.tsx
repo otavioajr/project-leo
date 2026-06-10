@@ -1,6 +1,7 @@
 "use client";
 
-import { notFound, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { AdventureUnavailable } from "../_components/adventure-unavailable";
 import Image from 'next/image';
 import { DollarSign, Timer, BarChart, MapPin, Info, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -154,7 +155,7 @@ export default function AdventurePage() {
   }
 
   if (!adventure) {
-    return notFound();
+    return <AdventureUnavailable />;
   }
 
   const usesBaterias = adventure.has_baterias === true;
