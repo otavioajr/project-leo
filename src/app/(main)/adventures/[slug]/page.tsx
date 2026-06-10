@@ -44,7 +44,7 @@ function useFetchAdventure(slug: string) {
       const { data, error: fetchError } = await supabase
         .from('adventures')
         .select(
-          'id, slug, title, description, long_description, max_participants, price, duration, location, difficulty, image_url, image_description, registrations_enabled, has_baterias, has_lotes, custom_fields, created_at'
+          'id, slug, title, description, long_description, max_participants, price, duration, location, difficulty, image_url, image_description, registrations_enabled, has_baterias, has_lotes, image_rights_enabled, custom_fields, created_at'
         )
         .eq('slug', slug)
         .maybeSingle();
@@ -336,6 +336,7 @@ export default function AdventurePage() {
                       remainingSpots={remainingSpots}
                       baterias={usesBaterias ? baterias : null}
                       hasLotes={usesLotes}
+                      requiresImageConsent={adventure.image_rights_enabled}
                     />
                   </CardContent>
                 </Card>

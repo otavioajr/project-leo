@@ -86,10 +86,15 @@ const participantSchema = z
 
 const PIX_MAX_GROUP_SIZE = 4;
 
+const IMAGE_CONSENT_KEY = "autorizacao_de_uso_de_imagem";
+const IMAGE_CONSENT_TEXT =
+  "Autorizo, de forma gratuita e por prazo indeterminado, o uso da minha imagem — e declaro ter autorização dos demais participantes inscritos por mim — em fotos e vídeos captados durante a aventura, para divulgação das atividades em redes sociais, site e materiais promocionais.";
+
 function createRegistrationSchema(
   remainingSpots: number | null,
   hasBaterias: boolean,
-  hasLotes: boolean
+  hasLotes: boolean,
+  requiresImageConsent: boolean
 ) {
   let groupSizeSchema: z.ZodType<number> = hasLotes
     ? z.literal(1)
@@ -112,8 +117,16 @@ function createRegistrationSchema(
       customData: z.record(customDataValueSchema).optional(),
       participants: z.array(participantSchema),
       principalBateriaId: z.string().optional(),
+      imageConsent: z.boolean(),
     })
     .superRefine((data, ctx) => {
+      if (requiresImageConsent && data.imageConsent !== true) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Você precisa autorizar o uso de imagem para concluir a inscrição.",
+          path: ["imageConsent"],
+        });
+      }
       if (!hasBaterias) return;
       if (!data.principalBateriaId) {
         ctx.addIssue({
@@ -145,6 +158,7 @@ type RegistrationFormProps = {
   remainingSpots: number | null;
   baterias: BateriaAvailability[] | null;
   hasLotes?: boolean;
+  requiresImageConsent?: boolean;
 };
 
 type RegistrationRpcErrorId =
@@ -232,6 +246,7 @@ export function RegistrationForm({
   remainingSpots,
   baterias,
   hasLotes = false,
+  requiresImageConsent = false,
 }: RegistrationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -292,12 +307,15 @@ export function RegistrationForm({
   });
 
   const form = useForm<RegistrationFormValues>({
-    resolver: zodResolver(createRegistrationSchema(remainingSpots, hasBaterias, hasLotes)),
+    resolver: zodResolver(
+      createRegistrationSchema(remainingSpots, hasBaterias, hasLotes, requiresImageConsent)
+    ),
     defaultValues: {
       groupSize: 1,
       customData: initialCustomData,
       participants: [],
       principalBateriaId: hasBaterias ? "" : undefined,
+      imageConsent: false,
     },
   });
 
@@ -400,6 +418,10 @@ export function RegistrationForm({
         customDataPayload[field.name] =
           typeof customValue === "string" ? customValue : "";
       });
+
+      if (requiresImageConsent) {
+        customDataPayload[IMAGE_CONSENT_KEY] = "Sim";
+      }
 
       const contactFields = deriveLegacyContactFields(allCustomFields, customDataPayload);
 
@@ -885,6 +907,29 @@ export function RegistrationForm({
             ))}
           </div>
         ))}
+
+        {requiresImageConsent && (
+          <FormField
+            control={form.control}
+            name="imageConsent"
+            render={({ field }) => (
+              <FormItem className="rounded-lg border p-4">
+                <div className="flex flex-row items-start gap-3 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <FormLabel className="text-sm font-normal leading-snug">
+                    {IMAGE_CONSENT_TEXT} <span className="text-destructive">*</span>
+                  </FormLabel>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         <Button type="submit" className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground text-lg font-bold rounded-full" disabled={isSubmitting}>
           {isSubmitting ? "Enviando..." : "Inscreva-se Agora"}
