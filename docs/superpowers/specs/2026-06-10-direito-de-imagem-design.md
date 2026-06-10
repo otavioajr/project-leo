@@ -81,7 +81,10 @@ ALTER TABLE adventures ADD COLUMN image_rights_enabled boolean NOT NULL DEFAULT 
 
 - Sem mudança em `registrations`, RLS ou RPCs
 - `adventures_select` é público (`USING (true)`) → o formulário público lê a flag sem mudança de policy; escrita já coberta por `is_admin()`
-- **Atenção operacional:** produção ainda grava no Supabase cloud (migração para VPS em andamento) — aplicar a migration no ambiente cloud também
+- **Pré-requisito de deploy:** a página pública (`/adventures/[slug]`) seleciona a coluna explicitamente — em ambiente sem a migration, o carregamento da aventura **falha em runtime** (erro 42703). Aplicar a migration **antes** do deploy do código, em cada ambiente:
+  1. Supabase cloud (produção atual): ✅ aplicada em 2026-06-10.
+  2. VPS (`api.otavio.junior.nom.br`): ⚠️ pendente — banco congelado nas migrations ≤007; aplicar 008–014 antes de apontar qualquer ambiente (inclusive `npm run dev` local) para ela.
+  3. Verificação pré-deploy em qualquer ambiente: `SELECT column_name FROM information_schema.columns WHERE table_name = 'adventures' AND column_name = 'image_rights_enabled';` → deve retornar 1 linha.
 
 ### `Adventure` (`src/lib/types.ts`)
 
