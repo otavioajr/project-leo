@@ -77,6 +77,7 @@ export type Adventure = {
   registrations_enabled: boolean;
   has_baterias: boolean;
   has_lotes: boolean;
+  image_rights_enabled: boolean;
   custom_fields?: CustomField[];
   pix_config?: PixConfig | null;
   created_at: string;
