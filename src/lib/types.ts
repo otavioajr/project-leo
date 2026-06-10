@@ -75,6 +75,7 @@ export type Adventure = {
   image_url: string;
   image_description: string;
   registrations_enabled: boolean;
+  is_enabled: boolean;
   has_baterias: boolean;
   has_lotes: boolean;
   image_rights_enabled: boolean;
