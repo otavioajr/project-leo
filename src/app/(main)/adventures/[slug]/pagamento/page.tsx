@@ -12,6 +12,7 @@ import { normalizePixConfig } from "@/lib/pix-config";
 import QRCode from "qrcode";
 import Image from "next/image";
 import Link from "next/link";
+import { AdventureUnavailable } from "../../_components/adventure-unavailable";
 
 export default function PagamentoPage() {
   const searchParams = useSearchParams();
@@ -50,19 +51,28 @@ export default function PagamentoPage() {
   const [pixConfig, setPixConfig] = useState<PixConfig | null>(null);
   const [lotePixCopiaECola, setLotePixCopiaECola] = useState("");
   const [isLoadingPixConfig, setIsLoadingPixConfig] = useState(true);
+  const [isAdventureAvailable, setIsAdventureAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!slug) {
+      setIsAdventureAvailable(false);
       setIsLoadingPixConfig(false);
       return;
     }
+
     supabase
       .from('adventures')
-      .select('pix_config')
+      .select('id, pix_config')
       .eq('slug', slug)
-      .single()
+      .maybeSingle()
       .then(({ data }) => {
-        setPixConfig(normalizePixConfig(data?.pix_config));
+        if (!data) {
+          setIsAdventureAvailable(false);
+          setPixConfig(null);
+        } else {
+          setIsAdventureAvailable(true);
+          setPixConfig(normalizePixConfig(data.pix_config));
+        }
         setIsLoadingPixConfig(false);
       });
   }, [supabase, slug]);
@@ -188,6 +198,10 @@ export default function PagamentoPage() {
         <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (isAdventureAvailable === false) {
+    return <AdventureUnavailable />;
   }
 
   if (!registrationId || !registration) {
