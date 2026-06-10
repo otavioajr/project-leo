@@ -191,6 +191,7 @@ const adventureSchema = z
     imageUrl: z.union([z.literal(""), z.string().url("URL da imagem invalida.")]),
     imageDescription: z.string(),
     registrationsEnabled: z.boolean(),
+    imageRightsEnabled: z.boolean(),
     hasBaterias: z.boolean(),
     baterias: z.array(bateriaSchema).optional(),
     hasLotes: z.boolean(),
@@ -357,6 +358,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       imageUrl: adventure?.image_url || "",
       imageDescription: adventure?.image_description || "",
       registrationsEnabled: adventure?.registrations_enabled ?? true,
+      imageRightsEnabled: adventure?.image_rights_enabled ?? false,
       hasBaterias: adventure?.has_baterias ?? false,
       baterias: [],
       hasLotes: adventure?.has_lotes ?? false,
@@ -617,6 +619,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       image_url: values.imageUrl,
       image_description: values.imageDescription,
       registrations_enabled: values.registrationsEnabled,
+      image_rights_enabled: values.imageRightsEnabled,
       custom_fields: normalizedCustomFields,
       pix_config: {
         pixEnabled: values.pixEnabled,
@@ -958,6 +961,26 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                     </FormItem>
                 )}
                 />
+            <FormField
+              control={form.control}
+              name="imageRightsEnabled"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel>Direito de Imagem</FormLabel>
+                    <FormDescription>
+                      Exige que o inscrito autorize o uso de sua imagem para concluir a inscrição.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="hasBaterias"
