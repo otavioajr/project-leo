@@ -52,6 +52,7 @@ import { useSupabase } from "@/supabase/hooks";
 import type { Adventure, Registration, PaymentStatus, Bateria } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { exportRegistrationsToXlsx } from "./_lib/export-registrations";
+import { RegistrationsSummary } from "./_components/registrations-summary";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -311,6 +312,14 @@ export default function RegistrationsPage() {
           </div>
         </div>
       </CardHeader>
+      {selectedAdventure && filteredRegistrations && (
+        <div className="px-6">
+          <RegistrationsSummary
+            adventure={selectedAdventure}
+            registrations={filteredRegistrations}
+          />
+        </div>
+      )}
       <CardContent>
         <Table>
           <TableHeader>
