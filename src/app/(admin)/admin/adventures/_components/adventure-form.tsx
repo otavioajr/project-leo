@@ -6,7 +6,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import type { Adventure, BateriaAvailability, LoteAvailability } from "@/lib/types";
+import type {
+  Adventure,
+  BateriaAvailability,
+  CustomFieldAudience,
+  LoteAvailability,
+} from "@/lib/types";
+import { resolveCustomFieldAudience } from "@/lib/registration-fields";
 import { useSupabase } from "@/supabase/hooks";
 import { normalizePixConfig } from "@/lib/pix-config";
 import { PixConfigDialog } from "./pix-config-dialog";
@@ -59,6 +65,7 @@ import {
 const customFieldTypes = [
   "text", "email", "tel", "number", "select", "multiselect", "tshirt_size",
 ] as const;
+const customFieldAudiences = ["primary", "additional", "all"] as const;
 type CustomFieldType = (typeof customFieldTypes)[number];
 
 function isOptionsFieldType(type: CustomFieldType) {
@@ -93,6 +100,7 @@ const customFieldSchema = z
     label: z.string().min(1, "O rótulo é obrigatório."),
     type: z.enum(customFieldTypes),
     required: z.boolean(),
+    audience: z.enum(customFieldAudiences).optional(),
     options: z.array(z.string()).optional(),
     helpImageUrl: z.union([z.literal(""), z.string().url("URL da imagem inválida.")]).optional(),
   })
@@ -1156,7 +1164,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                           <FormControl>
                             <LotePixField
                               label={form.watch(`lotes.${index}.label`) || `Lote ${index + 1}`}
-                              value={f.value}
+                              value={f.value ?? ""}
                               onChange={f.onChange}
                             />
                           </FormControl>
@@ -1357,37 +1365,33 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
         <Separator />
 
         <div>
-            <h3 className="text-xl font-headline font-semibold mb-4">Construtor de Formulário de Inscrição</h3>
+            <h3 className="text-xl font-headline font-semibold mb-4">
+              Construtor de Formulário de Inscrição
+            </h3>
             <FormDescription className="mb-4">
-              Configure os campos adicionais. Campos simples e tamanho de camiseta aparecem para todos os participantes; seleção única e seleção múltipla aparecem apenas para o contato principal.
+              Crie apenas os campos necessários e escolha para quem cada um aparece. É permitido salvar a aventura sem campos personalizados.
             </FormDescription>
 
-            {/* Campos fixos do sistema */}
-            <div className="mb-6 p-4 border rounded-lg bg-muted/30">
-              <h4 className="text-sm font-medium mb-3">Campos do Sistema (incluídos automaticamente)</h4>
-              <div className="space-y-2 text-sm">
-                <div>
-                  <p className="font-medium">Contato Principal:</p>
-                  <p className="text-muted-foreground ml-2">Nome Completo, E-mail, Telefone (obrigatórios) + todos os campos personalizados (incluindo tamanho de camiseta)</p>
-                </div>
-                <div>
-                  <p className="font-medium">Participantes Adicionais:</p>
-                  <p className="text-muted-foreground ml-2">Nome Completo (obrigatório) + campos simples (texto, e-mail, telefone e número) e tamanho de camiseta</p>
-                </div>
-              </div>
-            </div>
-
-            <h4 className="text-sm font-medium text-muted-foreground mb-3">Campos Personalizados</h4>
+            <h4 className="text-sm font-medium text-muted-foreground mb-3">
+              Campos Personalizados
+            </h4>
             <div className="space-y-6">
                 {fields.map((field, index) => {
                   const customFieldType = form.watch(`customFields.${index}.type` as const) as CustomFieldType;
+                  const customFieldAudience = form.watch(
+                    `customFields.${index}.audience` as const
+                  ) as CustomFieldAudience | undefined;
+                  const effectiveAudience = resolveCustomFieldAudience({
+                    type: customFieldType,
+                    audience: customFieldAudience,
+                  });
                   const customFieldOptions = form.watch(`customFields.${index}.options` as const) ?? [];
                   const shouldShowOptionsEditor = isOptionsFieldType(customFieldType);
                   const shouldShowTshirtHelpImage = isTshirtSizeFieldType(customFieldType);
 
                   return (
                     <div key={field.id} className="space-y-4 p-4 border rounded-md">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
                         <FormField
                           control={form.control}
                           name={`customFields.${index}.label` as const}
@@ -1447,6 +1451,31 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                             </FormItem>
                           )}
                         />
+                        <FormField
+                          control={form.control}
+                          name={`customFields.${index}.audience` as const}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Exibir para</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value ?? effectiveAudience}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o público" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="primary">Contato principal</SelectItem>
+                                  <SelectItem value="additional">Participantes adicionais</SelectItem>
+                                  <SelectItem value="all">Todos os participantes</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                         <div className="flex items-end gap-4">
                           <FormField
                             control={form.control}
@@ -1478,7 +1507,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                             <div>
                               <h5 className="text-sm font-medium">Opções de Seleção</h5>
                               <p className="text-xs text-muted-foreground">
-                                Essas opções aparecem para o contato principal no formulário público.
+                                Essas opções aparecem para o público selecionado no formulário.
                               </p>
                             </div>
                             <Button
@@ -1577,7 +1606,15 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                     variant="outline"
                     size="sm"
                     className="mt-2"
-                    onClick={() => append({ name: "", label: "", type: "text", required: false })}
+                    onClick={() =>
+                      append({
+                        name: "",
+                        label: "",
+                        type: "text",
+                        required: false,
+                        audience: "all",
+                      })
+                    }
                 >
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Adicionar Campo Personalizado
