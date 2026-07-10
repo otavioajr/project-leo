@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
@@ -30,59 +30,28 @@ import type {
   CustomField,
   RegistrationCustomData,
   RegistrationCustomValue,
+  RegistrationParticipantData,
 } from "@/lib/types";
+import {
+  buildCustomFieldPayload,
+  createCustomFieldDefaults,
+  filterCustomFieldsForTarget,
+  isRequiredCustomValueFilled,
+} from "@/lib/registration-fields";
 import { useSupabase } from "@/supabase/hooks";
 import {
   deriveLegacyContactFields,
   deriveParticipantDisplayName,
 } from "@/lib/registration-contact";
-import { TshirtSizeField } from "./tshirt-size-field";
-
-type SimpleCustomFieldType = "text" | "email" | "tel" | "number";
-type SimpleCustomField = CustomField & { type: SimpleCustomFieldType };
+import { DynamicRegistrationField } from "./dynamic-registration-field";
 
 const customDataValueSchema = z.union([z.string(), z.array(z.string())]);
-
-function isSimpleCustomField(field: CustomField): field is SimpleCustomField {
-  return (
-    field.type === "text" ||
-    field.type === "email" ||
-    field.type === "tel" ||
-    field.type === "number"
-  );
-}
-
-function isTshirtSizeField(field: CustomField): field is CustomField & { type: "tshirt_size" } {
-  return field.type === "tshirt_size";
-}
-
-function isParticipantCustomField(field: CustomField): boolean {
-  return isSimpleCustomField(field) || isTshirtSizeField(field);
-}
-
-function isRequiredCustomValueFilled(
-  field: CustomField,
-  value: RegistrationCustomValue | undefined
-): boolean {
-  if (!field.required) {
-    return true;
-  }
-
-  if (field.type === "multiselect") {
-    return (
-      Array.isArray(value) &&
-      value.some((selectedValue) => selectedValue.trim() !== "")
-    );
-  }
-
-  return typeof value === "string" && value.trim() !== "";
-}
 
 const participantSchema = z
   .object({
     bateriaId: z.string().optional(),
   })
-  .catchall(z.string());
+  .catchall(customDataValueSchema);
 
 const PIX_MAX_GROUP_SIZE = 4;
 
@@ -298,13 +267,19 @@ export function RegistrationForm({
     };
   }, [adventureId, hasBaterias, supabase]);
 
-  const allCustomFields = customFields ?? [];
-  const participantCustomFields = allCustomFields.filter(isParticipantCustomField);
-
-  const initialCustomData: RegistrationCustomData = {};
-  allCustomFields.forEach((field) => {
-    initialCustomData[field.name] = field.type === "multiselect" ? [] : "";
-  });
+  const allCustomFields = useMemo(() => customFields ?? [], [customFields]);
+  const primaryFields = useMemo(
+    () => filterCustomFieldsForTarget(allCustomFields, "primary"),
+    [allCustomFields]
+  );
+  const additionalFields = useMemo(
+    () => filterCustomFieldsForTarget(allCustomFields, "additional"),
+    [allCustomFields]
+  );
+  const initialCustomData = useMemo(
+    () => createCustomFieldDefaults(primaryFields),
+    [primaryFields]
+  );
 
   const form = useForm<RegistrationFormValues>({
     resolver: zodResolver(
@@ -337,19 +312,15 @@ export function RegistrationForm({
     if (hasLotes) return;
     const desiredParticipantCount = Math.max(0, groupSize - 1);
     const currentParticipantCount = fields.length;
-    const additionalParticipantFields = (customFields ?? []).filter(
-      isParticipantCustomField
-    );
 
     if (desiredParticipantCount > currentParticipantCount) {
-      const newFields: { bateriaId: string; [key: string]: string }[] = [];
+      const newFields: Array<RegistrationCustomData & { bateriaId: string }> = [];
+
       for (let i = 0; i < desiredParticipantCount - currentParticipantCount; i++) {
-        const newParticipant: { bateriaId: string; [key: string]: string } = {
+        const newParticipant: RegistrationCustomData & { bateriaId: string } = {
           bateriaId: "",
+          ...createCustomFieldDefaults(additionalFields),
         };
-        additionalParticipantFields.forEach((field) => {
-          newParticipant[field.name] = "";
-        });
         newFields.push(newParticipant);
       }
       append(newFields);
@@ -361,14 +332,21 @@ export function RegistrationForm({
         )
       );
     }
-  }, [groupSize, fields.length, append, remove, customFields, hasLotes]);
+  }, [
+    additionalFields,
+    append,
+    fields.length,
+    groupSize,
+    hasLotes,
+    remove,
+  ]);
 
   async function onSubmit(values: RegistrationFormValues) {
     setIsSubmitting(true);
 
     let isValid = true;
 
-    allCustomFields.forEach((field) => {
+    primaryFields.forEach((field) => {
       const customValue = values.customData?.[field.name];
       if (!isRequiredCustomValueFilled(field, customValue)) {
         form.setError(`customData.${field.name}` as const, {
@@ -379,14 +357,17 @@ export function RegistrationForm({
       }
     });
 
-    values.participants.forEach((participant, pIndex) => {
-      participantCustomFields.forEach((field) => {
+    values.participants.forEach((participant, participantIndex) => {
+      additionalFields.forEach((field) => {
         const participantValue = participant[field.name];
-        if (field.required && (!participantValue || participantValue.trim() === "")) {
-          form.setError(`participants.${pIndex}.${field.name}` as const, {
-            type: "manual",
-            message: `${field.label} é obrigatório.`,
-          });
+        if (!isRequiredCustomValueFilled(field, participantValue)) {
+          form.setError(
+            `participants.${participantIndex}.${field.name}` as const,
+            {
+              type: "manual",
+              message: `${field.label} é obrigatório.`,
+            }
+          );
           isValid = false;
         }
       });
@@ -405,44 +386,34 @@ export function RegistrationForm({
     let shouldResetSubmitting = true;
 
     try {
-      const customDataPayload: RegistrationCustomData = {};
-      allCustomFields.forEach((field) => {
-        const customValue = values.customData?.[field.name];
-        if (field.type === "multiselect") {
-          customDataPayload[field.name] = Array.isArray(customValue)
-            ? customValue
-            : [];
-          return;
-        }
-
-        customDataPayload[field.name] =
-          typeof customValue === "string" ? customValue : "";
-      });
+      const customDataPayload = buildCustomFieldPayload(
+        primaryFields,
+        values.customData
+      );
 
       if (requiresImageConsent) {
         customDataPayload[IMAGE_CONSENT_KEY] = "Sim";
       }
 
-      const contactFields = deriveLegacyContactFields(allCustomFields, customDataPayload);
+      const contactFields = deriveLegacyContactFields(
+        primaryFields,
+        customDataPayload
+      );
 
-      const participantsPayload: Record<string, string>[] = values.participants.map(
-        (participant) => {
-          const participantPayload: Record<string, string> = {};
-
-          participantCustomFields.forEach((field) => {
-            const participantValue = participant[field.name];
-            participantPayload[field.name] =
-              typeof participantValue === "string" ? participantValue : "";
-          });
+      const participantsPayload: RegistrationParticipantData[] =
+        values.participants.map((participant) => {
+          const participantPayload = buildCustomFieldPayload(
+            additionalFields,
+            participant
+          ) as RegistrationParticipantData;
 
           participantPayload.name = deriveParticipantDisplayName(
-            participantCustomFields,
+            additionalFields,
             participantPayload
           );
 
           return participantPayload;
-        }
-      );
+        });
 
       const bateriaAssignments = hasBaterias
         ? {
@@ -673,13 +644,13 @@ export function RegistrationForm({
           </>
         ) : null}
 
-        {allCustomFields.length > 0 ? (
+        {primaryFields.length > 0 ? (
           <h3 className="text-lg font-medium">Informações da inscrição</h3>
-        ) : (
+        ) : allCustomFields.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Nenhum campo adicional configurado para esta aventura.
           </p>
-        )}
+        ) : null}
         {hasBaterias && bateriasState && (
           <FormField
             control={form.control}
@@ -711,202 +682,102 @@ export function RegistrationForm({
             )}
           />
         )}
-        {allCustomFields.map((customField) => (
+        {primaryFields.map((customField) => (
           <FormField
             key={customField.name}
             control={form.control}
-            name={`customData.${customField.name}`}
-            render={({ field }) => {
-              const label = (
-                <>
-                  {customField.label}
-                  {customField.required && <span className="text-destructive">*</span>}
-                </>
-              );
-
-              if (customField.type === "tshirt_size") {
-                const options = customField.options ?? [];
-                const selectValue = typeof field.value === "string" ? field.value : "";
-
-                return (
-                  <TshirtSizeField
-                    label={customField.label}
-                    required={customField.required}
-                    options={options}
-                    helpImageUrl={customField.helpImageUrl}
-                    value={selectValue}
-                    onChange={field.onChange}
-                    name={field.name}
-                    onBlur={field.onBlur}
-                  />
-                );
-              }
-
-              if (customField.type === "select") {
-                const options = customField.options ?? [];
-                const selectValue = typeof field.value === "string" ? field.value : "";
-
-                return (
-                  <FormItem>
-                    <FormLabel>{label}</FormLabel>
-                    <Select onValueChange={field.onChange} value={selectValue}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={`Selecione ${customField.label.toLowerCase()}`} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {options.map((option) => (
-                          <SelectItem key={`${customField.name}-${option}`} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                );
-              }
-
-              if (customField.type === "multiselect") {
-                const options = customField.options ?? [];
-                const selectedValues = Array.isArray(field.value) ? field.value : [];
-
-                return (
-                  <FormItem>
-                    <FormLabel>{label}</FormLabel>
-                    <div className="space-y-2">
-                      {options.map((option) => {
-                        const checked = selectedValues.includes(option);
-                        return (
-                          <div key={`${customField.name}-${option}`} className="flex items-center gap-2">
-                            <Checkbox
-                              checked={checked}
-                              onCheckedChange={(isChecked) => {
-                                const nextValues =
-                                  isChecked === true
-                                    ? Array.from(new Set([...selectedValues, option]))
-                                    : selectedValues.filter(
-                                        (selectedValue) => selectedValue !== option
-                                      );
-                                field.onChange(nextValues);
-                              }}
-                            />
-                            <span className="text-sm font-normal">{option}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                );
-              }
-
-              const inputValue = typeof field.value === "string" ? field.value : "";
-
-              return (
-                <FormItem>
-                  <FormLabel>{label}</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder={customField.label}
-                      type={customField.type}
-                      name={field.name}
-                      value={inputValue}
-                      onBlur={field.onBlur}
-                      onChange={field.onChange}
-                      ref={field.ref}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              );
-            }}
+            name={`customData.${customField.name}` as const}
+            render={({ field }) => (
+              <DynamicRegistrationField
+                customField={customField}
+                value={field.value as RegistrationCustomValue | undefined}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                name={field.name}
+                inputRef={field.ref}
+              />
+            )}
           />
         ))}
 
-        {!hasLotes && fields.length > 0 && <Separator />}
+        {!hasLotes &&
+          fields.length > 0 &&
+          (hasBaterias || additionalFields.length > 0) && <Separator />}
 
-        {!hasLotes && fields.map((participantField, index) => (
-          <div
-            key={participantField.id}
-            className="space-y-4 border-l-4 border-secondary pl-4 py-4"
-          >
-            <h3 className="text-lg font-medium">Dados do Participante {index + 2}</h3>
-            {hasBaterias && bateriasState && (
-              <FormField
-                control={form.control}
-                name={`participants.${index}.bateriaId`}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bateria</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione uma bateria" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {bateriasState.map((b) => {
-                          const available = computeAvailableForBateria(b.id, index);
-                          const disabled = available < 1 && field.value !== b.id;
-                          return (
-                            <SelectItem key={b.id} value={b.id} disabled={disabled}>
-                              {b.label} — {b.start_time.slice(0, 5)}-{b.end_time.slice(0, 5)}{" "}
-                              {disabled ? "(sem vagas)" : `(${Math.max(available, 0)} ${available === 1 ? "vaga" : "vagas"})`}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-            {participantCustomFields.map((customField) => (
-              <FormField
-                key={customField.name}
-                control={form.control}
-                name={`participants.${index}.${customField.name}`}
-                render={({ field }) => {
-                  if (customField.type === "tshirt_size") {
-                    const options = customField.options ?? [];
-                    return (
-                      <TshirtSizeField
-                        label={customField.label}
-                        required={customField.required}
-                        options={options}
-                        helpImageUrl={customField.helpImageUrl}
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        name={field.name}
-                        onBlur={field.onBlur}
-                      />
-                    );
-                  }
+        {!hasLotes &&
+          (hasBaterias || additionalFields.length > 0) &&
+          fields.map((participantField, index) => (
+            <div
+              key={participantField.id}
+              className="space-y-4 border-l-4 border-secondary pl-4 py-4"
+            >
+              <h3 className="text-lg font-medium">
+                Dados do Participante {index + 2}
+              </h3>
 
-                  return (
+              {hasBaterias && bateriasState && (
+                <FormField
+                  control={form.control}
+                  name={`participants.${index}.bateriaId`}
+                  render={({ field }) => (
                     <FormItem>
-                      <FormLabel>
-                        {customField.label}
-                        {customField.required && <span className="text-destructive">*</span>}
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder={customField.label}
-                          type={customField.type}
-                          {...field}
-                        />
-                      </FormControl>
+                      <FormLabel>Bateria</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={typeof field.value === "string" ? field.value : ""}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione uma bateria" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {bateriasState.map((b) => {
+                            const available = computeAvailableForBateria(b.id, index);
+                            const disabled = available < 1 && field.value !== b.id;
+                            return (
+                              <SelectItem
+                                key={b.id}
+                                value={b.id}
+                                disabled={disabled}
+                              >
+                                {b.label} — {b.start_time.slice(0, 5)}-
+                                {b.end_time.slice(0, 5)}{" "}
+                                {disabled
+                                  ? "(sem vagas)"
+                                  : `(${Math.max(available, 0)} ${
+                                      available === 1 ? "vaga" : "vagas"
+                                    })`}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
-                  );
-                }}
-              />
-            ))}
-          </div>
-        ))}
+                  )}
+                />
+              )}
+
+              {additionalFields.map((customField) => (
+                <FormField
+                  key={customField.name}
+                  control={form.control}
+                  name={`participants.${index}.${customField.name}` as const}
+                  render={({ field }) => (
+                    <DynamicRegistrationField
+                      customField={customField}
+                      value={field.value as RegistrationCustomValue | undefined}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      inputRef={field.ref}
+                    />
+                  )}
+                />
+              ))}
+            </div>
+          ))}
 
         {requiresImageConsent && (
           <FormField
