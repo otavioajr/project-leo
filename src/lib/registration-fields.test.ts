@@ -101,3 +101,17 @@ test("monta payload apenas com os campos recebidos e preserva arrays", () => {
     { nome: "Ana", preferencias: ["Manhã", "Tarde"] }
   );
 });
+
+test("preserva __proto__ como campo customizado sem alterar o protótipo", () => {
+  const payload = buildCustomFieldPayload(
+    [field({ name: "__proto__", type: "multiselect" })],
+    Object.fromEntries([["__proto__", ["Manhã"]]])
+  );
+
+  assert.deepEqual(payload["__proto__"], ["Manhã"]);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(payload, "__proto__"),
+    true
+  );
+  assert.equal(Object.getPrototypeOf(payload), Object.prototype);
+});

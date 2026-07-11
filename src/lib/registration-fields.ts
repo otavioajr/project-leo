@@ -65,19 +65,19 @@ export function buildCustomFieldPayload(
   fields: CustomField[],
   values: Record<string, RegistrationCustomValue | undefined> | undefined
 ): RegistrationCustomData {
-  const payload: RegistrationCustomData = {};
+  return Object.fromEntries(
+    fields.map((field) => {
+      const value = values?.[field.name];
+      const fieldValue =
+        field.type === "multiselect"
+          ? Array.isArray(value)
+            ? value
+            : []
+          : typeof value === "string"
+            ? value
+            : "";
 
-  fields.forEach((field) => {
-    const value = values?.[field.name];
-    payload[field.name] =
-      field.type === "multiselect"
-        ? Array.isArray(value)
-          ? value
-          : []
-        : typeof value === "string"
-          ? value
-          : "";
-  });
-
-  return payload;
+      return [field.name, fieldValue] as const;
+    })
+  );
 }
