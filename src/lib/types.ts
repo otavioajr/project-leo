@@ -1,8 +1,11 @@
+export type CustomFieldAudience = 'primary' | 'additional' | 'all';
+
 export type CustomField = {
   name: string;
   label: string;
   type: 'text' | 'email' | 'tel' | 'number' | 'select' | 'multiselect' | 'tshirt_size';
   required: boolean;
+  audience?: CustomFieldAudience;
   options?: string[];
   helpImageUrl?: string;
 };
@@ -10,6 +13,8 @@ export type CustomField = {
 export type RegistrationCustomValue = string | string[];
 
 export type RegistrationCustomData = Record<string, RegistrationCustomValue>;
+
+export type RegistrationParticipantData = RegistrationCustomData;
 
 export type Bateria = {
   id: string;
@@ -93,7 +98,7 @@ export type Registration = {
     phone: string;
     registration_date: string;
     group_size: number;
-    participants?: Record<string, string>[];
+    participants?: RegistrationParticipantData[];
     payment_status?: PaymentStatus;
     total_amount?: number;
     registration_token?: string;

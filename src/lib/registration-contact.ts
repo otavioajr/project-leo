@@ -43,7 +43,7 @@ export function deriveLegacyContactFields(
 
 export function deriveParticipantDisplayName(
   fields: CustomField[],
-  values: Record<string, string>
+  values: RegistrationCustomData
 ): string {
   const textFields = fields.filter((field) => field.type === "text");
   const nameField =
@@ -51,8 +51,9 @@ export function deriveParticipantDisplayName(
       (field) => /nome/i.test(field.label) || field.name === "nome" || field.name === "name"
     ) ?? textFields[0];
 
-  if (nameField && values[nameField.name]?.trim()) {
-    return values[nameField.name].trim();
+  const value = nameField ? values[nameField.name] : undefined;
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
   }
 
   return "—";
@@ -64,7 +65,7 @@ type FormatCustomDataOptions = {
 };
 
 export function formatCustomDataEntries(
-  customData: RegistrationCustomData | Record<string, string> | undefined,
+  customData: RegistrationCustomData | undefined,
   options?: FormatCustomDataOptions
 ): { label: string; value: string }[] {
   if (!customData) {
