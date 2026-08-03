@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { z } from "zod";
 import { useForm, useFieldArray, Controller, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,7 +42,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { Trash, PlusCircle, AlertTriangle } from "lucide-react";
+import { Trash, PlusCircle, AlertTriangle, GripVertical } from "lucide-react";
 import { ImageUpload } from "@/components/image-upload";
 
 import {
@@ -138,6 +139,12 @@ const customFieldSchema = z
       seenOptions.add(trimmedOption);
     });
   });
+
+type CustomFieldFormValue = z.infer<typeof customFieldSchema>;
+
+function createEmptyCustomField(): CustomFieldFormValue {
+  return { name: "", label: "", type: "text", required: false };
+}
 
 const bateriaSchema = z
   .object({
@@ -495,10 +502,18 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
     };
   }, [adventure?.id, supabase, form]);
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, insert, move, remove } = useFieldArray({
     control: form.control,
     name: "customFields",
   });
+  const [draggedFieldIndex, setDraggedFieldIndex] = useState<number | null>(null);
+
+  function handleCustomFieldDrop(targetIndex: number) {
+    if (draggedFieldIndex !== null && draggedFieldIndex !== targetIndex) {
+      move(draggedFieldIndex, targetIndex);
+    }
+    setDraggedFieldIndex(null);
+  }
 
   function handleCustomFieldTypeChange(fieldIndex: number, type: CustomFieldType) {
     const optionsPath = `customFields.${fieldIndex}.options` as const;
@@ -1386,7 +1401,34 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                   const shouldShowTshirtHelpImage = isTshirtSizeFieldType(customFieldType);
 
                   return (
-                    <div key={field.id} className="space-y-4 p-4 border rounded-md">
+                    <div key={field.id} className="space-y-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => insert(index, createEmptyCustomField())}
+                      >
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Adicionar campo antes de {field.label.trim() || "campo sem rótulo"}
+                      </Button>
+                      <div className="space-y-4 p-4 border rounded-md">
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            draggable
+                            aria-label={`Arrastar campo ${field.label.trim() || `sem rótulo ${index + 1}`}`}
+                            title="Arraste para reordenar"
+                            onDragStart={() => setDraggedFieldIndex(index)}
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={() => handleCustomFieldDrop(index)}
+                            onDragEnd={() => setDraggedFieldIndex(null)}
+                          >
+                            <GripVertical className="h-4 w-4" aria-hidden="true" />
+                            <span className="sr-only">Reordenar campos</span>
+                          </Button>
+                        </div>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <FormField
                           control={form.control}
@@ -1569,6 +1611,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                           )}
                         </div>
                       )}
+                      </div>
                     </div>
                   );
                 })}
@@ -1577,7 +1620,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                     variant="outline"
                     size="sm"
                     className="mt-2"
-                    onClick={() => append({ name: "", label: "", type: "text", required: false })}
+                    onClick={() => append(createEmptyCustomField())}
                 >
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Adicionar Campo Personalizado
