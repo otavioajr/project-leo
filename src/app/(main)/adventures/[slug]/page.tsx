@@ -1,11 +1,13 @@
 "use client";
 
+import React from "react";
 import { useParams } from 'next/navigation';
 import { AdventureUnavailable } from "../_components/adventure-unavailable";
 import Image from 'next/image';
 import { DollarSign, Timer, BarChart, MapPin, Info, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RegistrationForm } from './_components/registration-form';
+import { LinkifiedText } from '@/components/linkified-text';
 import { useSupabase } from '@/supabase/hooks';
 import type { ActiveLote, Adventure, BateriaAvailability } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -264,7 +266,7 @@ export default function AdventurePage() {
             ) : null}
             <div className="prose max-w-none text-foreground text-lg leading-relaxed">
               <div className="whitespace-pre-line">
-                {adventure.long_description}
+                <LinkifiedText text={adventure.long_description} />
               </div>
             </div>
           </div>
