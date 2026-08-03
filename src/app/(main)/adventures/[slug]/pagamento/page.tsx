@@ -1,14 +1,17 @@
 "use client";
 
+import React from "react";
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useParams } from "next/navigation";
 import { useSupabase } from "@/supabase/hooks";
+import { useDoc } from "@/supabase/use-doc";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { LoaderCircle, Copy, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
-import type { Registration, PixConfig } from "@/lib/types";
+import type { HomePageContent, Registration, PixConfig } from "@/lib/types";
 import { normalizePixConfig } from "@/lib/pix-config";
+import { buildCardPaymentWhatsAppUrl } from "@/lib/whatsapp";
 import QRCode from "qrcode";
 import Image from "next/image";
 import Link from "next/link";
@@ -28,7 +31,13 @@ export default function PagamentoPage() {
   const [copied, setCopied] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"choice" | "pix" | "card">("choice");
   const isConfirmingRef = useRef(false);
+
+  const { data: homePageDoc, isLoading: isLoadingHomePage } = useDoc<{ data: HomePageContent }>(
+    "content",
+    "homepage",
+  );
 
   // Fetch registration data via RPC (public/unauthenticated access)
   const [registration, setRegistration] = useState<Registration | null>(null);
@@ -110,6 +119,15 @@ export default function PagamentoPage() {
       ? pixConfig.pixCopiaECola[groupSizeSlot]
       : "";
 
+  const cardPaymentWhatsAppUrl = registration
+    ? buildCardPaymentWhatsAppUrl(
+        homePageDoc?.data?.whatsAppNumber ?? "",
+        registration.adventure_title,
+      )
+    : null;
+  const hasPixPayment = Boolean(pixConfig?.pixEnabled && pixCopiaECola);
+  const hasCardPayment = Boolean(cardPaymentWhatsAppUrl);
+
   // Generate QR Code when PIX copia-e-cola changes
   useEffect(() => {
     if (pixCopiaECola) {
@@ -190,7 +208,7 @@ export default function PagamentoPage() {
     }
   };
 
-  const isLoading = isLoadingRegistration || isLoadingPixConfig;
+  const isLoading = isLoadingRegistration || isLoadingPixConfig || isLoadingHomePage;
 
   if (isLoading) {
     return (
@@ -248,6 +266,77 @@ export default function PagamentoPage() {
     );
   }
 
+  const renderCardPayment = (showBackToOptions: boolean) => (
+    <div className="container mx-auto px-4 py-8">
+      <Card className="mx-auto max-w-md">
+        <CardHeader>
+          <CardTitle className="text-center text-primary">Pague com cartão</CardTitle>
+          <CardDescription className="text-center">
+            Fale com Leo para concluir o pagamento da sua inscrição.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-center">
+          <CheckCircle2 className="mx-auto h-20 w-20 text-green-500" />
+          <p>
+            Leo enviará o link para pagamento por cartão da inscrição de{" "}
+            <strong>{registration.adventure_title}</strong>.
+          </p>
+        </CardContent>
+        <CardFooter className="flex flex-col gap-3">
+          <Button asChild className="w-full">
+            <a
+              href={cardPaymentWhatsAppUrl ?? "#"}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              Falar com Leo no WhatsApp
+            </a>
+          </Button>
+          {showBackToOptions && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => setPaymentMethod("choice")}
+            >
+              Voltar para opções de pagamento
+            </Button>
+          )}
+        </CardFooter>
+      </Card>
+    </div>
+  );
+
+  if (paymentConfirmed) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="mx-auto max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center text-primary">Aguardando Confirmacao</CardTitle>
+            <CardDescription className="text-center">
+              Sua inscricao para <strong>{registration.adventure_title}</strong> esta aguardando a confirmacao do pagamento.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <Clock className="mx-auto mb-4 h-20 w-20 text-amber-500" />
+            <p className="text-muted-foreground">
+              O administrador ira verificar seu pagamento em breve. Voce recebera uma confirmacao por e-mail.
+            </p>
+          </CardContent>
+          <CardFooter className="justify-center">
+            <Button asChild>
+              <Link href="/">Voltar para Home</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!hasPixPayment && hasCardPayment) {
+    return renderCardPayment(false);
+  }
+
   if (!pixConfig?.pixEnabled) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -299,30 +388,41 @@ export default function PagamentoPage() {
     );
   }
 
-  if (paymentConfirmed) {
+  if (hasPixPayment && hasCardPayment && paymentMethod === "choice") {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card className="mx-auto max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center text-primary">Aguardando Confirmacao</CardTitle>
-            <CardDescription className="text-center">
-              Sua inscricao para <strong>{registration.adventure_title}</strong> esta aguardando a confirmacao do pagamento.
+          <CardHeader className="text-center">
+            <CardTitle className="text-primary">Escolha como pagar</CardTitle>
+            <CardDescription>
+              Selecione uma forma de pagamento para sua inscrição em{" "}
+              <strong>{registration.adventure_title}</strong>.
             </CardDescription>
           </CardHeader>
-          <CardContent className="text-center">
-            <Clock className="mx-auto mb-4 h-20 w-20 text-amber-500" />
-            <p className="text-muted-foreground">
-              O administrador ira verificar seu pagamento em breve. Voce recebera uma confirmacao por e-mail.
-            </p>
-          </CardContent>
-          <CardFooter className="justify-center">
-            <Button asChild>
-              <Link href="/">Voltar para Home</Link>
+          <CardContent className="space-y-3">
+            <Button
+              type="button"
+              className="w-full"
+              onClick={() => setPaymentMethod("pix")}
+            >
+              Pagar por PIX
             </Button>
-          </CardFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => setPaymentMethod("card")}
+            >
+              Pagar com cartão
+            </Button>
+          </CardContent>
         </Card>
       </div>
     );
+  }
+
+  if (hasPixPayment && hasCardPayment && paymentMethod === "card") {
+    return renderCardPayment(true);
   }
 
   const formatCurrency = (value: number) => {
