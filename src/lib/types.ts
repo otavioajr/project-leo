@@ -116,6 +116,7 @@ export type HomePageContent = {
   instagramEnabled?: boolean;
   twitterUrl?: string;
   twitterEnabled?: boolean;
+  whatsAppNumber?: string;
 };
 
 export type ContentPage = {

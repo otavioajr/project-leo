@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { HomePageContent } from "@/lib/types";
+import { normalizeWhatsAppNumber } from "@/lib/whatsapp";
 import { useSupabase } from "@/supabase/hooks";
 
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ import { Switch } from "@/components/ui/switch";
 import { ImageUpload } from "@/components/image-upload";
 
 
-const homePageContentSchema = z.object({
+export const homePageContentSchema = z.object({
     heroTitle: z.string().min(1, "O titulo do heroi e obrigatorio."),
     heroDescription: z.string().min(1, "A descricao do heroi e obrigatoria."),
     heroImageUrl: z.string().min(1, "A imagem do heroi e obrigatoria.").url("A URL da imagem do heroi e invalida."),
@@ -40,6 +41,10 @@ const homePageContentSchema = z.object({
     instagramEnabled: z.boolean().optional(),
     twitterUrl: z.string().optional(),
     twitterEnabled: z.boolean().optional(),
+    whatsAppNumber: z.string().optional().refine(
+      (value) => !value?.trim() || normalizeWhatsAppNumber(value) !== null,
+      "Informe um WhatsApp válido com DDD e país, se aplicável.",
+    ),
 }).refine((data) => !data.facebookEnabled || (data.facebookUrl && data.facebookUrl.length > 0), {
     message: "URL do Facebook e obrigatorio quando habilitado.",
     path: ["facebookUrl"],
@@ -73,6 +78,7 @@ export function HomePageForm({ content }: HomePageFormProps) {
       instagramEnabled: content.instagramEnabled ?? false,
       twitterUrl: content.twitterUrl ?? "",
       twitterEnabled: content.twitterEnabled ?? false,
+      whatsAppNumber: content.whatsAppNumber ?? "",
     },
   });
 
@@ -80,7 +86,13 @@ export function HomePageForm({ content }: HomePageFormProps) {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.from('content').upsert({ id: 'homepage', data: values });
+      const { error } = await supabase.from('content').upsert({
+        id: 'homepage',
+        data: {
+          ...values,
+          whatsAppNumber: normalizeWhatsAppNumber(values.whatsAppNumber ?? "") ?? "",
+        },
+      });
       if (error) throw error;
       toast({
         title: "Pagina Principal Atualizada",
@@ -196,6 +208,32 @@ export function HomePageForm({ content }: HomePageFormProps) {
                 </FormItem>
                 )}
             />
+        </div>
+
+        <Separator />
+
+        <h3 className="text-xl font-headline font-semibold">Pagamento</h3>
+        <p className="text-sm text-muted-foreground">
+          Configure o WhatsApp que receberá os pedidos de pagamento com cartão.
+        </p>
+
+        <div className="space-y-4">
+          <FormField
+            control={form.control}
+            name="whatsAppNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>WhatsApp para pagamento com cartão</FormLabel>
+                <FormControl>
+                  <Input type="tel" placeholder="(55) 11 99999-8888" {...field} />
+                </FormControl>
+                <FormDescription>
+                  Informe DDD e país, se aplicável. Deixe vazio para não oferecer cartão.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
 
         <Separator />
