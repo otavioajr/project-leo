@@ -72,3 +72,34 @@ CSS variables defined in `src/app/globals.css` for light/dark modes. Font famili
 - Component sub-pieces go in `_components/` folders within route directories
 - Environment variables: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (see `.env.local.example`)
 - Supabase migrations in `supabase/migrations/` — numbered sequentially
+
+## Cursor Cloud specific instructions
+
+### Serviços
+
+| Serviço | Obrigatório | Como iniciar |
+|---|---|---|
+| Next.js dev server | Sim | `npm run dev` → http://localhost:9002 |
+| Supabase (hosted) | Sim | Projeto remoto `project-leo` (`iyvtoeoeytueoeromdwi`, região `sa-east-1`); sem docker-compose nem stack local no repositório |
+| Genkit AI | Não | `npm run genkit:dev` (não usado pela UI atual) |
+
+### Variáveis de ambiente
+
+Copie `.env.local.example` para `.env.local` e preencha com a URL e a chave anon do projeto Supabase. O app falha na inicialização se `NEXT_PUBLIC_SUPABASE_URL` ou `NEXT_PUBLIC_SUPABASE_ANON_KEY` estiverem ausentes. Use o MCP Supabase (`get_project_url`, `get_publishable_keys`) ou o dashboard do Supabase para obter os valores.
+
+### Verificação local
+
+- Lint: `npm run lint` (apenas warnings conhecidos em `adventure-form.tsx` e `layout.tsx`)
+- Typecheck: `npm run typecheck`
+- Build: `npm run build`
+- Não há framework de testes configurado
+
+### Fluxo público para validar o ambiente
+
+1. `npm run dev`
+2. Abrir http://localhost:9002 — homepage com listagem de aventuras (dados do Supabase)
+3. Clicar em uma aventura (ex.: `/adventures/escalada-em-familia`) — página de detalhe com preço, local e status de vagas
+
+### Admin
+
+Login em `/login` exige usuário Supabase Auth com `app_metadata.is_admin = true`. Sem credenciais de admin, valide apenas o fluxo público acima.

@@ -1,6 +1,6 @@
 import writeXlsxFile, { type Schema } from "write-excel-file/browser";
 
-import type { Registration, RegistrationCustomValue } from "@/lib/types";
+import type { Registration, RegistrationCustomData } from "@/lib/types";
 import { isPlaceholderRegistrationEmail } from "@/lib/registration-contact";
 
 type ExportCellValue = string | number | boolean | Date | null | undefined;
@@ -153,7 +153,7 @@ function collectStableCustomColumns(
 
 function mapCustomValues(
   customColumns: ExportRegistrationsCustomColumn[],
-  values: Record<string, RegistrationCustomValue> | Record<string, string> | undefined
+  values: RegistrationCustomData | undefined
 ) {
   const customValues = createEmptyCustomValues(customColumns);
 

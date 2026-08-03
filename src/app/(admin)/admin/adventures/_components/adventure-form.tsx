@@ -5,9 +5,15 @@ import { z } from "zod";
 import { useForm, useFieldArray, Controller, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import type { Adventure, BateriaAvailability, LoteAvailability } from "@/lib/types";
+import type {
+  Adventure,
+  BateriaAvailability,
+  CustomFieldAudience,
+  LoteAvailability,
+} from "@/lib/types";
+import { resolveCustomFieldAudience } from "@/lib/registration-fields";
 import { useSupabase } from "@/supabase/hooks";
 import { normalizePixConfig } from "@/lib/pix-config";
 import { PixConfigDialog } from "./pix-config-dialog";
@@ -60,6 +66,7 @@ import {
 const customFieldTypes = [
   "text", "email", "tel", "number", "select", "multiselect", "tshirt_size",
 ] as const;
+const customFieldAudiences = ["primary", "additional", "all"] as const;
 type CustomFieldType = (typeof customFieldTypes)[number];
 
 function isOptionsFieldType(type: CustomFieldType) {
@@ -88,12 +95,22 @@ function normalizeSelectionOptions(options?: string[]) {
   return normalizedOptions;
 }
 
+function slugifyFieldName(label: string) {
+  return label
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 const customFieldSchema = z
   .object({
     name: z.string().min(1, "O nome do campo é obrigatório.").regex(/^[a-z0-9_]+$/, "Use apenas letras minúsculas, números e sublinhados (sem espaços)."),
     label: z.string().min(1, "O rótulo é obrigatório."),
     type: z.enum(customFieldTypes),
     required: z.boolean(),
+    audience: z.enum(customFieldAudiences).optional(),
     options: z.array(z.string()).optional(),
     helpImageUrl: z.union([z.literal(""), z.string().url("URL da imagem inválida.")]).optional(),
   })
@@ -174,14 +191,11 @@ const loteSchema = z.object({
 
 const adventureSchema = z
   .object({
-    title: z.string().min(3, "O titulo deve ter pelo menos 3 caracteres."),
+    title: z.string().trim().min(1, "O título é obrigatório."),
     description: z
       .string()
-      .min(10, "A descricao curta deve ter pelo menos 10 caracteres.")
       .max(150, "A descricao curta deve ter menos de 150 caracteres."),
-    longDescription: z
-      .string()
-      .min(20, "A descricao longa deve ter pelo menos 20 caracteres."),
+    longDescription: z.string(),
     maxParticipants: z.preprocess(
       (value) => (value === "" ? null : value),
       z.union([
@@ -189,8 +203,11 @@ const adventureSchema = z
         z.null(),
       ])
     ),
-    price: z.coerce.number().min(0, "O preco deve ser um numero positivo."),
-    duration: z.string().min(1, "A duracao e obrigatoria."),
+    price: z.preprocess(
+      (value) => (value === "" ? 0 : value),
+      z.coerce.number().min(0, "O preco deve ser um numero positivo.")
+    ),
+    duration: z.string(),
     location: z.string(),
     difficulty: z
       .string()
@@ -204,7 +221,29 @@ const adventureSchema = z
     baterias: z.array(bateriaSchema).optional(),
     hasLotes: z.boolean(),
     lotes: z.array(loteSchema).optional(),
-    customFields: z.array(customFieldSchema).optional(),
+    customFields: z
+      .array(customFieldSchema)
+      .superRefine((customFields, context) => {
+        const seenNames = new Set<string>();
+
+        customFields.forEach((customField, index) => {
+          if (!customField.name) {
+            return;
+          }
+
+          if (seenNames.has(customField.name)) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Este ID já está em uso em outro campo.",
+              path: [index, "name"],
+            });
+            return;
+          }
+
+          seenNames.add(customField.name);
+        });
+      })
+      .optional(),
     pixEnabled: z.boolean(),
     pixCopiaECola: z.object({
       1: z.string(),
@@ -515,6 +554,51 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
     setDraggedFieldIndex(null);
   }
 
+  // IDs de campos que não devem mais ser sincronizados com o rótulo: campos
+  // já salvos (mudar o ID desvincularia respostas de inscrições existentes)
+  // e campos cujo ID foi editado manualmente pelo admin.
+  const lockedFieldIdsRef = useRef<Set<string> | null>(null);
+  if (lockedFieldIdsRef.current === null) {
+    lockedFieldIdsRef.current = new Set(fields.map((field) => field.id));
+  }
+
+  function isCustomFieldNameSynced(fieldId: string) {
+    return !lockedFieldIdsRef.current?.has(fieldId);
+  }
+
+  function lockCustomFieldName(fieldId: string) {
+    lockedFieldIdsRef.current?.add(fieldId);
+  }
+
+  function handleCustomFieldLabelChange(fieldIndex: number, fieldId: string, label: string) {
+    if (!isCustomFieldNameSynced(fieldId)) {
+      return;
+    }
+
+    const namePath = `customFields.${fieldIndex}.name` as const;
+    const baseSlug = slugifyFieldName(label);
+
+    if (!baseSlug) {
+      form.setValue(namePath, "", { shouldDirty: true });
+      return;
+    }
+
+    const otherNames = new Set(
+      (form.getValues("customFields") ?? [])
+        .filter((_, index) => index !== fieldIndex)
+        .map((customField) => customField.name)
+    );
+
+    let slug = baseSlug;
+    let suffix = 2;
+    while (otherNames.has(slug)) {
+      slug = `${baseSlug}_${suffix}`;
+      suffix += 1;
+    }
+
+    form.setValue(namePath, slug, { shouldDirty: true, shouldValidate: true });
+  }
+
   function handleCustomFieldTypeChange(fieldIndex: number, type: CustomFieldType) {
     const optionsPath = `customFields.${fieldIndex}.options` as const;
     const helpImagePath = `customFields.${fieldIndex}.helpImageUrl` as const;
@@ -528,7 +612,12 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       if (isTshirtSizeFieldType(type)) {
         const currentLabel = form.getValues(labelPath);
         if (!currentLabel?.trim()) {
-          form.setValue(labelPath, "Tamanho de camiseta", { shouldDirty: true });
+          const defaultLabel = "Tamanho de camiseta";
+          form.setValue(labelPath, defaultLabel, { shouldDirty: true });
+          const fieldId = fields[fieldIndex]?.id;
+          if (fieldId) {
+            handleCustomFieldLabelChange(fieldIndex, fieldId, defaultLabel);
+          }
         }
         if (form.getValues(helpImagePath) === undefined) {
           form.setValue(helpImagePath, "", { shouldDirty: true });
@@ -1171,7 +1260,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                           <FormControl>
                             <LotePixField
                               label={form.watch(`lotes.${index}.label`) || `Lote ${index + 1}`}
-                              value={f.value}
+                              value={f.value ?? ""}
                               onChange={f.onChange}
                             />
                           </FormControl>
@@ -1372,30 +1461,27 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
         <Separator />
 
         <div>
-            <h3 className="text-xl font-headline font-semibold mb-4">Construtor de Formulário de Inscrição</h3>
+            <h3 className="text-xl font-headline font-semibold mb-4">
+              Construtor de Formulário de Inscrição
+            </h3>
             <FormDescription className="mb-4">
-              Configure os campos adicionais. Campos simples e tamanho de camiseta aparecem para todos os participantes; seleção única e seleção múltipla aparecem apenas para o contato principal.
+              Crie apenas os campos necessários e escolha para quem cada um aparece. É permitido salvar a aventura sem campos personalizados.
             </FormDescription>
 
-            {/* Campos fixos do sistema */}
-            <div className="mb-6 p-4 border rounded-lg bg-muted/30">
-              <h4 className="text-sm font-medium mb-3">Campos do Sistema (incluídos automaticamente)</h4>
-              <div className="space-y-2 text-sm">
-                <div>
-                  <p className="font-medium">Contato Principal:</p>
-                  <p className="text-muted-foreground ml-2">Nome Completo, E-mail, Telefone (obrigatórios) + todos os campos personalizados (incluindo tamanho de camiseta)</p>
-                </div>
-                <div>
-                  <p className="font-medium">Participantes Adicionais:</p>
-                  <p className="text-muted-foreground ml-2">Nome Completo (obrigatório) + campos simples (texto, e-mail, telefone e número) e tamanho de camiseta</p>
-                </div>
-              </div>
-            </div>
-
-            <h4 className="text-sm font-medium text-muted-foreground mb-3">Campos Personalizados</h4>
+            <h4 className="text-sm font-medium text-muted-foreground mb-3">
+              Campos Personalizados
+            </h4>
             <div className="space-y-6">
                 {fields.map((field, index) => {
+                  const fieldArrayId = field.id;
                   const customFieldType = form.watch(`customFields.${index}.type` as const) as CustomFieldType;
+                  const customFieldAudience = form.watch(
+                    `customFields.${index}.audience` as const
+                  ) as CustomFieldAudience | undefined;
+                  const effectiveAudience = resolveCustomFieldAudience({
+                    type: customFieldType,
+                    audience: customFieldAudience,
+                  });
                   const customFieldOptions = form.watch(`customFields.${index}.options` as const) ?? [];
                   const shouldShowOptionsEditor = isOptionsFieldType(customFieldType);
                   const shouldShowTshirtHelpImage = isTshirtSizeFieldType(customFieldType);
@@ -1429,7 +1515,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                             <span className="sr-only">Reordenar campos</span>
                           </Button>
                         </div>
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
                         <FormField
                           control={form.control}
                           name={`customFields.${index}.label` as const}
@@ -1437,7 +1523,18 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                             <FormItem>
                               <FormLabel>Rótulo do Campo</FormLabel>
                               <FormControl>
-                                <Input placeholder="Ex: CPF" {...field} />
+                                <Input
+                                  placeholder="Ex: CPF"
+                                  {...field}
+                                  onChange={(event) => {
+                                    field.onChange(event);
+                                    handleCustomFieldLabelChange(
+                                      index,
+                                      fieldArrayId,
+                                      event.target.value
+                                    );
+                                  }}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -1450,8 +1547,20 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                             <FormItem>
                               <FormLabel>Nome do Campo (ID)</FormLabel>
                               <FormControl>
-                                <Input placeholder="Ex: cpf" {...field} />
+                                <Input
+                                  placeholder="Ex: cpf"
+                                  {...field}
+                                  onChange={(event) => {
+                                    lockCustomFieldName(fieldArrayId);
+                                    field.onChange(event);
+                                  }}
+                                />
                               </FormControl>
+                              {isCustomFieldNameSynced(fieldArrayId) && (
+                                <FormDescription>
+                                  Preenchido automaticamente a partir do rótulo.
+                                </FormDescription>
+                              )}
                               <FormMessage />
                             </FormItem>
                           )}
@@ -1489,6 +1598,31 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                             </FormItem>
                           )}
                         />
+                        <FormField
+                          control={form.control}
+                          name={`customFields.${index}.audience` as const}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Exibir para</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value ?? effectiveAudience}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o público" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="primary">Contato principal</SelectItem>
+                                  <SelectItem value="additional">Participantes adicionais</SelectItem>
+                                  <SelectItem value="all">Todos os participantes</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                         <div className="flex items-end gap-4">
                           <FormField
                             control={form.control}
@@ -1520,7 +1654,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                             <div>
                               <h5 className="text-sm font-medium">Opções de Seleção</h5>
                               <p className="text-xs text-muted-foreground">
-                                Essas opções aparecem para o contato principal no formulário público.
+                                Essas opções aparecem para o público selecionado no formulário.
                               </p>
                             </div>
                             <Button
