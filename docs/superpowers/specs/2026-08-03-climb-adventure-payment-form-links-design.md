@@ -14,9 +14,10 @@ Melhorar a inscrição da Climb Adventure sem substituir o pagamento PIX existen
 A página pública de pagamento passa a começar com duas opções equivalentes: **Pagar por PIX** e **Pagar com cartão**.
 
 - Ao escolher PIX, a interface atual de QR Code, copia-e-cola e confirmação é exibida sem alteração de comportamento.
-- Ao escolher cartão, a interface apresenta o contato do Leo e um botão que abre o WhatsApp já configurado pela aplicação.
+- Ao escolher cartão, a interface apresenta o contato do Leo e um botão que abre o WhatsApp configurado no painel administrativo.
 - O botão leva uma mensagem pré-preenchida informando que a pessoa quer pagar a inscrição por cartão.
 - O cartão não cria cobrança automática, não introduz gateway e não exige registrar uma nova forma de pagamento na inscrição nesta entrega.
+- O número de WhatsApp é uma configuração global da página principal, validada e salva pelo administrador; quando estiver ausente, a opção de cartão explica que o contato ainda não está disponível e não mostra um botão inválido.
 
 ## Campos configuráveis
 
@@ -40,7 +41,7 @@ O campo de descritivo longo continua sendo texto simples com quebras de linha.
 ## Componentes e fluxo de dados
 
 1. A página pública de pagamento controla a etapa escolhida localmente: seleção, PIX existente ou orientação para cartão.
-2. A configuração de WhatsApp já existente fornece o destino do contato; o texto da mensagem é montado a partir da aventura/inscrição de forma segura para URL.
+2. A configuração global da página principal fornece o destino do contato; o texto da mensagem é montado a partir da aventura/inscrição de forma segura para URL.
 3. O formulário administrativo usa as operações de inserção e movimentação da lista de campos já mantida pelo formulário.
 4. A página pública da aventura converte apenas trechos validados como URLs em links React; os demais trechos são renderizados como texto.
 
