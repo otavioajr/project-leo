@@ -85,40 +85,54 @@ export default function RegistrationsPage() {
   const [registrationToDelete, setRegistrationToDelete] = useState<string | null>(null);
   const [selectedAdventureId, setSelectedAdventureId] = useState<string>("");
   const [bateriaLabelMap, setBateriaLabelMap] = useState<Map<string, string>>(new Map());
+  const [loteLabelMap, setLoteLabelMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     const list = (registrations ?? []) as Registration[];
-    const adventureIds = Array.from(
-      new Set(
-        list
-          .filter((r) => r.bateria_assignments)
-          .map((r) => r.adventure_id)
-      )
-    );
+    const adventureIds = Array.from(new Set(list.map((r) => r.adventure_id)));
     if (adventureIds.length === 0) {
       setBateriaLabelMap(new Map());
+      setLoteLabelMap(new Map());
       return;
     }
     let cancelled = false;
     async function load() {
-      const { data, error } = await supabase
-        .from("adventure_baterias")
-        .select("id, label")
-        .in("adventure_id", adventureIds);
+      const [bateriasRes, lotesRes] = await Promise.all([
+        supabase
+          .from("adventure_baterias")
+          .select("id, label")
+          .in("adventure_id", adventureIds),
+        supabase
+          .from("adventure_lotes")
+          .select("id, label")
+          .in("adventure_id", adventureIds),
+      ]);
       if (cancelled) return;
-      if (error) {
-        console.error("Failed to load bateria labels:", error);
-        return;
+      if (bateriasRes.error) {
+        console.error("Failed to load bateria labels:", bateriasRes.error);
+      } else {
+        const map = new Map<string, string>();
+        (bateriasRes.data ?? []).forEach((b: Pick<Bateria, "id" | "label">) => map.set(b.id, b.label));
+        setBateriaLabelMap(map);
       }
-      const map = new Map<string, string>();
-      (data ?? []).forEach((b: Pick<Bateria, "id" | "label">) => map.set(b.id, b.label));
-      setBateriaLabelMap(map);
+      if (lotesRes.error) {
+        console.error("Failed to load lote labels:", lotesRes.error);
+      } else {
+        const map = new Map<string, string>();
+        (lotesRes.data ?? []).forEach((l: { id: string; label: string }) => map.set(l.id, l.label));
+        setLoteLabelMap(map);
+      }
     }
     void load();
     return () => {
       cancelled = true;
     };
   }, [registrations, supabase]);
+
+  function summarizeLote(registration: Registration): string {
+    if (!registration.lote_id) return "—";
+    return loteLabelMap.get(registration.lote_id) ?? "Lote?";
+  }
 
   function summarizeBaterias(registration: Registration): string {
     if (!registration.bateria_assignments) return "—";
@@ -244,6 +258,7 @@ export default function RegistrationsPage() {
         adventureTitle,
         registrations: filteredRegistrations,
         bateriaLabels: bateriaLabelMap,
+        loteLabels: loteLabelMap,
       });
 
       toast({
@@ -328,6 +343,7 @@ export default function RegistrationsPage() {
               <TableHead>Participantes</TableHead>
               <TableHead>Contato</TableHead>
               <TableHead>Baterias</TableHead>
+              <TableHead>Lote</TableHead>
               <TableHead>Pagamento</TableHead>
               <TableHead>Data da Inscricao</TableHead>
               <TableHead>Acoes</TableHead>
@@ -396,6 +412,7 @@ export default function RegistrationsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-sm">{summarizeBaterias(reg)}</TableCell>
+                  <TableCell className="text-sm">{summarizeLote(reg)}</TableCell>
                   <TableCell>
                     {reg.payment_status ? (
                       <div className="space-y-1">

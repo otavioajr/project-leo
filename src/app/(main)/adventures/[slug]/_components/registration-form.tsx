@@ -27,6 +27,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import type {
   BateriaAvailability,
+  BateriaWithLoteAvailability,
   CustomField,
   RegistrationCustomData,
   RegistrationCustomValue,
@@ -63,6 +64,7 @@ function createRegistrationSchema(
   remainingSpots: number | null,
   hasBaterias: boolean,
   hasLotes: boolean,
+  hasCombinedMode: boolean,
   requiresImageConsent: boolean
 ) {
   let groupSizeSchema: z.ZodType<number> = hasLotes
@@ -126,6 +128,7 @@ type RegistrationFormProps = {
   customFields?: CustomField[];
   remainingSpots: number | null;
   baterias: BateriaAvailability[] | null;
+  bateriasWithLotes?: BateriaWithLoteAvailability[] | null;
   hasLotes?: boolean;
   requiresImageConsent?: boolean;
 };
@@ -214,6 +217,7 @@ export function RegistrationForm({
   customFields,
   remainingSpots,
   baterias,
+  bateriasWithLotes = null,
   hasLotes = false,
   requiresImageConsent = false,
 }: RegistrationFormProps) {
@@ -222,42 +226,69 @@ export function RegistrationForm({
   const supabase = useSupabase();
   const router = useRouter();
 
+  const hasCombinedMode = (bateriasWithLotes?.length ?? 0) > 0;
   const [bateriasState, setBateriasState] = useState<BateriaAvailability[] | null>(baterias);
+  const [combinedBateriasState, setCombinedBateriasState] = useState<
+    BateriaWithLoteAvailability[] | null
+  >(bateriasWithLotes);
 
   useEffect(() => {
     setBateriasState(baterias);
   }, [baterias]);
 
-  const hasBaterias = (bateriasState?.length ?? 0) > 0;
+  useEffect(() => {
+    setCombinedBateriasState(bateriasWithLotes);
+  }, [bateriasWithLotes]);
+
+  const hasBaterias = hasCombinedMode || (bateriasState?.length ?? 0) > 0;
 
   useEffect(() => {
     if (!hasBaterias) return;
+
+    async function refreshAvailability() {
+      if (hasCombinedMode) {
+        const { data, error } = await supabase.rpc("get_baterias_with_lote_availability", {
+          p_adventure_id: adventureId,
+        });
+        if (error) {
+          console.error("Failed to refresh baterias with lotes:", error);
+          return;
+        }
+        setCombinedBateriasState((data ?? []) as BateriaWithLoteAvailability[]);
+        return;
+      }
+
+      const { data, error } = await supabase.rpc("get_adventure_baterias_with_availability", {
+        p_adventure_id: adventureId,
+      });
+      if (error) {
+        console.error("Failed to refresh baterias:", error);
+        return;
+      }
+      setBateriasState((data ?? []) as BateriaAvailability[]);
+    }
+
     const channel = supabase
       .channel(`baterias-${adventureId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "adventure_baterias", filter: `adventure_id=eq.${adventureId}` },
-        async () => {
-          const { data, error } = await supabase
-            .rpc("get_adventure_baterias_with_availability", { p_adventure_id: adventureId });
-          if (error) {
-            console.error("Failed to refresh baterias:", error);
-            return;
-          }
-          setBateriasState((data ?? []) as BateriaAvailability[]);
+        () => {
+          void refreshAvailability();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "adventure_lotes", filter: `adventure_id=eq.${adventureId}` },
+        () => {
+          void refreshAvailability();
         }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "registrations", filter: `adventure_id=eq.${adventureId}` },
-        async () => {
-          const { data, error } = await supabase
-            .rpc("get_adventure_baterias_with_availability", { p_adventure_id: adventureId });
-          if (error) {
-            console.error("Failed to refresh baterias:", error);
-            return;
-          }
-          setBateriasState((data ?? []) as BateriaAvailability[]);
+        () => {
+          void refreshAvailability();
         }
       )
       .subscribe();
@@ -265,7 +296,7 @@ export function RegistrationForm({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [adventureId, hasBaterias, supabase]);
+  }, [adventureId, hasBaterias, hasCombinedMode, supabase]);
 
   const allCustomFields = useMemo(() => customFields ?? [], [customFields]);
   const primaryFields = useMemo(
@@ -283,7 +314,13 @@ export function RegistrationForm({
 
   const form = useForm<RegistrationFormValues>({
     resolver: zodResolver(
-      createRegistrationSchema(remainingSpots, hasBaterias, hasLotes, requiresImageConsent)
+      createRegistrationSchema(
+        remainingSpots,
+        hasBaterias,
+        hasLotes,
+        hasCombinedMode,
+        requiresImageConsent
+      )
     ),
     defaultValues: {
       groupSize: 1,
@@ -418,7 +455,9 @@ export function RegistrationForm({
       const bateriaAssignments = hasBaterias
         ? {
             principal: values.principalBateriaId,
-            participants: values.participants.map((p) => p.bateriaId ?? ""),
+            participants: hasCombinedMode
+              ? []
+              : values.participants.map((p) => p.bateriaId ?? ""),
           }
         : null;
 
@@ -550,6 +589,16 @@ export function RegistrationForm({
   const watchedParticipants = form.watch("participants");
 
   function computeAvailableForBateria(bateriaId: string, excludeIndex: number | "principal"): number {
+    if (hasCombinedMode && combinedBateriasState) {
+      const bateria = combinedBateriasState.find((b) => b.id === bateriaId);
+      if (!bateria) return 0;
+      let allocated = 0;
+      if (excludeIndex !== "principal" && principalBateriaId === bateriaId) {
+        allocated += 1;
+      }
+      return Math.max(bateria.active_lote_remaining - allocated, 0);
+    }
+
     if (!bateriasState) return 0;
     const bateria = bateriasState.find((b) => b.id === bateriaId);
     if (!bateria) return 0;
@@ -594,19 +643,32 @@ export function RegistrationForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit, handleInvalid)} className="space-y-6">
-        {hasBaterias && bateriasState && (
+        {hasBaterias && (hasCombinedMode ? combinedBateriasState : bateriasState) && (
           <div className="rounded-lg border bg-muted/30 p-3">
             <p className="text-sm font-semibold mb-2">Vagas por Bateria</p>
             <ul className="space-y-1 text-sm">
-              {bateriasState.map((b) => {
-                const remaining = Math.max(b.capacity - b.reserved, 0);
+              {(hasCombinedMode ? combinedBateriasState! : bateriasState!).map((b) => {
+                const remaining = hasCombinedMode
+                  ? Math.max((b as BateriaWithLoteAvailability).active_lote_remaining, 0)
+                  : Math.max(
+                      (b as BateriaAvailability).capacity - (b as BateriaAvailability).reserved,
+                      0
+                    );
+                const priceLabel =
+                  hasCombinedMode && (b as BateriaWithLoteAvailability).active_lote_price != null
+                    ? ` · R$${Number((b as BateriaWithLoteAvailability).active_lote_price).toFixed(2)}`
+                    : "";
+                const loteLabel =
+                  hasCombinedMode && (b as BateriaWithLoteAvailability).active_lote_label
+                    ? ` · ${(b as BateriaWithLoteAvailability).active_lote_label}`
+                    : "";
                 return (
                   <li key={b.id} className="flex justify-between">
                     <span>
-                      {b.label} ({b.start_time.slice(0, 5)}-{b.end_time.slice(0, 5)})
+                      {b.label} ({b.start_time.slice(0, 5)}-{b.end_time.slice(0, 5)}){loteLabel}
                     </span>
                     <span className={remaining > 0 ? "text-green-700 font-semibold" : "text-destructive font-semibold"}>
-                      {remaining > 0 ? `${remaining} ${remaining === 1 ? "vaga" : "vagas"}` : "sem vagas"}
+                      {remaining > 0 ? `${remaining} ${remaining === 1 ? "vaga" : "vagas"}${priceLabel}` : "sem vagas"}
                     </span>
                   </li>
                 );
@@ -651,7 +713,7 @@ export function RegistrationForm({
             Nenhum campo adicional configurado para esta aventura.
           </p>
         ) : null}
-        {hasBaterias && bateriasState && (
+        {hasBaterias && (hasCombinedMode ? combinedBateriasState : bateriasState) && (
           <FormField
             control={form.control}
             name="principalBateriaId"
@@ -665,12 +727,18 @@ export function RegistrationForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {bateriasState.map((b) => {
+                    {(hasCombinedMode ? combinedBateriasState! : bateriasState!).map((b) => {
                       const available = computeAvailableForBateria(b.id, "principal");
                       const disabled = available < 1 && field.value !== b.id;
+                      const priceSuffix =
+                        hasCombinedMode &&
+                        (b as BateriaWithLoteAvailability).active_lote_price != null
+                          ? ` · R$${Number((b as BateriaWithLoteAvailability).active_lote_price).toFixed(2)}`
+                          : "";
                       return (
                         <SelectItem key={b.id} value={b.id} disabled={disabled}>
-                          {b.label} — {b.start_time.slice(0, 5)}-{b.end_time.slice(0, 5)}{" "}
+                          {b.label} — {b.start_time.slice(0, 5)}-{b.end_time.slice(0, 5)}
+                          {priceSuffix}{" "}
                           {disabled ? "(sem vagas)" : `(${Math.max(available, 0)} ${available === 1 ? "vaga" : "vagas"})`}
                         </SelectItem>
                       );

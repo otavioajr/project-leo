@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RegistrationForm } from './_components/registration-form';
 import { LinkifiedText } from '@/components/linkified-text';
 import { useSupabase } from '@/supabase/hooks';
-import type { ActiveLote, Adventure, BateriaAvailability } from '@/lib/types';
+import type { ActiveLote, Adventure, BateriaAvailability, BateriaWithLoteAvailability } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect } from 'react';
 import { useHeaderTransparent } from '@/components/layout/header-context';
@@ -19,6 +19,7 @@ function useFetchAdventure(slug: string) {
   const [adventure, setAdventure] = useState<Adventure | null>(null);
   const [reservedParticipants, setReservedParticipants] = useState(0);
   const [baterias, setBaterias] = useState<BateriaAvailability[] | null>(null);
+  const [bateriasWithLotes, setBateriasWithLotes] = useState<BateriaWithLoteAvailability[] | null>(null);
   const [activeLote, setActiveLote] = useState<ActiveLote | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -30,6 +31,7 @@ function useFetchAdventure(slug: string) {
       setAdventure(null);
       setReservedParticipants(0);
       setBaterias(null);
+      setBateriasWithLotes(null);
       setActiveLote(null);
       setError(null);
       setIsLoading(false);
@@ -39,6 +41,7 @@ function useFetchAdventure(slug: string) {
     setAdventure(null);
     setReservedParticipants(0);
     setBaterias(null);
+    setBateriasWithLotes(null);
     setActiveLote(null);
     setError(null);
     setIsLoading(true);
@@ -68,7 +71,16 @@ function useFetchAdventure(slug: string) {
       const typedAdventure = data as Adventure;
       setAdventure(typedAdventure);
 
-      if (typedAdventure.has_lotes) {
+      if (typedAdventure.has_lotes && typedAdventure.has_baterias) {
+        const { data: combinedData, error: combinedError } = await supabase
+          .rpc('get_baterias_with_lote_availability', { p_adventure_id: typedAdventure.id });
+        if (cancelled) return;
+        if (combinedError) {
+          setError(new Error(combinedError.message));
+        } else {
+          setBateriasWithLotes((combinedData ?? []) as BateriaWithLoteAvailability[]);
+        }
+      } else if (typedAdventure.has_lotes) {
         const { data: loteData, error: loteError } = await supabase
           .rpc('get_active_lote', { p_adventure_id: typedAdventure.id });
         if (cancelled) return;
@@ -111,13 +123,13 @@ function useFetchAdventure(slug: string) {
     };
   }, [supabase, slug]);
 
-  return { adventure, reservedParticipants, baterias, activeLote, isLoading, error };
+  return { adventure, reservedParticipants, baterias, bateriasWithLotes, activeLote, isLoading, error };
 }
 
 export default function AdventurePage() {
   const params = useParams();
   const slug = params.slug as string;
-  const { adventure, reservedParticipants, baterias, activeLote, isLoading, error } = useFetchAdventure(slug);
+  const { adventure, reservedParticipants, baterias, bateriasWithLotes, activeLote, isLoading, error } = useFetchAdventure(slug);
   const { setTransparent } = useHeaderTransparent();
 
   useEffect(() => {
@@ -162,21 +174,34 @@ export default function AdventurePage() {
 
   const usesBaterias = adventure.has_baterias === true;
   const usesLotes = adventure.has_lotes === true;
-  const displayPrice = usesLotes ? (activeLote?.price ?? adventure.price) : adventure.price;
+  const usesCombinedMode = usesBaterias && usesLotes;
 
-  const remainingSpots = usesLotes
-    ? (activeLote?.remaining ?? 0)
-    : usesBaterias
-      ? (baterias
-          ? baterias.reduce((sum, b) => sum + Math.max(b.capacity - b.reserved, 0), 0)
-          : null)
-      : adventure.max_participants === null
-        ? null
-        : Math.max(adventure.max_participants - reservedParticipants, 0);
+  const displayPrice = usesCombinedMode
+    ? (bateriasWithLotes?.find((b) => b.active_lote_price != null)?.active_lote_price ??
+      adventure.price)
+    : usesLotes
+      ? (activeLote?.price ?? adventure.price)
+      : adventure.price;
 
-  const isSoldOut = usesLotes
-    ? activeLote === null || activeLote.remaining <= 0
-    : remainingSpots !== null && remainingSpots <= 0;
+  const remainingSpots = usesCombinedMode
+    ? (bateriasWithLotes
+        ? bateriasWithLotes.reduce((sum, b) => sum + Math.max(b.active_lote_remaining, 0), 0)
+        : 0)
+    : usesLotes
+      ? (activeLote?.remaining ?? 0)
+      : usesBaterias
+        ? (baterias
+            ? baterias.reduce((sum, b) => sum + Math.max(b.capacity - b.reserved, 0), 0)
+            : null)
+        : adventure.max_participants === null
+          ? null
+          : Math.max(adventure.max_participants - reservedParticipants, 0);
+
+  const isSoldOut = usesCombinedMode
+    ? (bateriasWithLotes?.every((b) => b.active_lote_remaining <= 0) ?? true)
+    : usesLotes
+      ? activeLote === null || activeLote.remaining <= 0
+      : remainingSpots !== null && remainingSpots <= 0;
 
   return (
     <div>
@@ -208,7 +233,35 @@ export default function AdventurePage() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
           <div className="lg:col-span-3">
             <p className="text-lg leading-relaxed text-muted-foreground mb-6">{adventure.description}</p>
-            {usesLotes && activeLote ? (
+            {usesCombinedMode && bateriasWithLotes && bateriasWithLotes.length > 0 ? (
+              <div className="mb-6 rounded-2xl border bg-muted/40 px-4 py-3">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="rounded-full bg-primary/10 p-2">
+                    <Users className="h-5 w-5 text-primary" />
+                  </div>
+                  <p className="font-semibold text-foreground">Horários disponíveis</p>
+                </div>
+                <ul className="ml-12 space-y-1 text-sm">
+                  {bateriasWithLotes.map((b) => (
+                    <li key={b.id} className="flex justify-between gap-4">
+                      <span>
+                        {b.label} — {b.start_time.slice(0, 5)}-{b.end_time.slice(0, 5)}
+                        {b.active_lote_label ? ` · ${b.active_lote_label}` : ""}
+                      </span>
+                      <span
+                        className={
+                          b.active_lote_remaining > 0 ? "text-foreground" : "text-destructive"
+                        }
+                      >
+                        {b.active_lote_remaining > 0
+                          ? `${b.active_lote_remaining} vagas · R$${Number(b.active_lote_price ?? 0).toFixed(2)}`
+                          : "esgotada"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : usesLotes && activeLote ? (
               <div className="mb-6 flex items-center gap-3 rounded-2xl border bg-muted/40 px-4 py-3">
                 <div className="rounded-full bg-primary/10 p-2">
                   <Users className="h-5 w-5 text-primary" />
@@ -337,7 +390,8 @@ export default function AdventurePage() {
                       adventurePrice={displayPrice}
                       customFields={adventure.custom_fields}
                       remainingSpots={remainingSpots}
-                      baterias={usesBaterias ? baterias : null}
+                      baterias={usesBaterias && !usesCombinedMode ? baterias : null}
+                      bateriasWithLotes={usesCombinedMode ? bateriasWithLotes : null}
                       hasLotes={usesLotes}
                       requiresImageConsent={adventure.image_rights_enabled}
                     />

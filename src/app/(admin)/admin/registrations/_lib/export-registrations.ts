@@ -11,6 +11,7 @@ export type ExportRegistrationsInput = {
   adventureTitle: string;
   registrations: Registration[];
   bateriaLabels?: Map<string, string>;
+  loteLabels?: Map<string, string>;
 };
 
 export type ExportRegistrationsCustomColumn = {
@@ -27,6 +28,7 @@ export type ExportRegistrationRow = {
   groupPosition: number;
   personName: string;
   bateriaLabel: string;
+  loteLabel: string;
   contactName: string;
   contactEmail: string;
   contactPhone: string;
@@ -171,7 +173,8 @@ function mapCustomValues(
 function flattenRegistration(
   registration: Registration,
   customColumns: ExportRegistrationsCustomColumn[],
-  bateriaLabels: Map<string, string> | undefined
+  bateriaLabels: Map<string, string> | undefined,
+  loteLabels: Map<string, string> | undefined
 ): ExportRegistrationRow[] {
   const baseRow = {
     registrationId: registration.id,
@@ -197,6 +200,10 @@ function flattenRegistration(
     ? resolveLabel(registration.bateria_assignments.principal)
     : EMPTY_CELL;
 
+  const loteLabel = registration.lote_id
+    ? loteLabels?.get(registration.lote_id) ?? EMPTY_CELL
+    : EMPTY_CELL;
+
   const rows: ExportRegistrationRow[] = [
     {
       ...baseRow,
@@ -204,6 +211,7 @@ function flattenRegistration(
       groupPosition: 1,
       personName: registration.name,
       bateriaLabel: principalBateria,
+      loteLabel,
       customValues: mapCustomValues(customColumns, registration.custom_data),
     },
   ];
@@ -217,6 +225,7 @@ function flattenRegistration(
       groupPosition: index + 2,
       personName: normalizeTextCellValue(participant.name),
       bateriaLabel: resolveLabel(participantBaterias[index]),
+      loteLabel: EMPTY_CELL,
       customValues: mapCustomValues(customColumns, participant),
     });
   }
@@ -294,6 +303,12 @@ function buildExportSchema(
       value: (row) => row.bateriaLabel,
     },
     {
+      column: "Lote",
+      type: String,
+      width: 20,
+      value: (row) => row.loteLabel,
+    },
+    {
       column: "Nome",
       type: String,
       width: 24,
@@ -346,11 +361,12 @@ function buildExportSchema(
 
 export function getRegistrationExportRows(
   registrations: Registration[],
-  bateriaLabels?: Map<string, string>
+  bateriaLabels?: Map<string, string>,
+  loteLabels?: Map<string, string>
 ) {
   const customColumns = collectStableCustomColumns(registrations);
   const rows = registrations.flatMap((registration) =>
-    flattenRegistration(registration, customColumns, bateriaLabels)
+    flattenRegistration(registration, customColumns, bateriaLabels, loteLabels)
   );
 
   return {
@@ -363,10 +379,15 @@ export async function exportRegistrationsToXlsx({
   adventureTitle,
   registrations,
   bateriaLabels,
+  loteLabels,
 }: ExportRegistrationsInput) {
   const normalizedAdventureTitle =
     adventureTitle.trim() || registrations[0]?.adventure_title || "Aventura";
-  const { customColumns, rows } = getRegistrationExportRows(registrations, bateriaLabels);
+  const { customColumns, rows } = getRegistrationExportRows(
+    registrations,
+    bateriaLabels,
+    loteLabels
+  );
 
   await writeXlsxFile(rows, {
     schema: buildExportSchema(customColumns),

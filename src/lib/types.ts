@@ -45,6 +45,7 @@ export type BateriaAssignments = {
 export type Lote = {
   id: string;
   adventure_id: string;
+  bateria_id: string | null;
   label: string;
   sort_order: number;
   capacity: number;
@@ -55,6 +56,7 @@ export type Lote = {
 
 export type LoteAvailability = {
   id: string;
+  bateria_id: string | null;
   label: string;
   sort_order: number;
   capacity: number;
@@ -64,6 +66,18 @@ export type LoteAvailability = {
 
 export type ActiveLote = LoteAvailability & {
   remaining: number;
+};
+
+export type BateriaWithLoteAvailability = {
+  id: string;
+  label: string;
+  start_time: string;
+  end_time: string;
+  sort_order: number;
+  active_lote_id: string | null;
+  active_lote_label: string | null;
+  active_lote_price: number | null;
+  active_lote_remaining: number;
 };
 
 export type Adventure = {

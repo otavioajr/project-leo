@@ -1,4 +1,4 @@
-import type { Adventure, BateriaAvailability, Registration } from "@/lib/types";
+import type { Adventure, BateriaAvailability, BateriaWithLoteAvailability, LoteAvailability, Registration } from "@/lib/types";
 
 export type BateriaStats = {
   id: string;
@@ -9,6 +9,16 @@ export type BateriaStats = {
   sortOrder: number;
   total: number;
   confirmed: number;
+  activeLoteLabel?: string | null;
+  activeLoteRemaining?: number;
+};
+
+export type LoteStats = {
+  id: string;
+  label: string;
+  total: number;
+  confirmed: number;
+  capacity: number;
 };
 
 export type RegistrationSummaryStats = {
@@ -16,7 +26,9 @@ export type RegistrationSummaryStats = {
   confirmedStudents: number;
   maxParticipants: number | null;
   hasBaterias: boolean;
+  hasLotes: boolean;
   baterias: BateriaStats[];
+  lotes: LoteStats[];
 };
 
 function accumulateBateriaCounts(
@@ -42,6 +54,8 @@ export function computeRegistrationStats(
   registrations: Registration[],
   adventure: Adventure,
   baterias: BateriaAvailability[],
+  bateriasWithLotes: BateriaWithLoteAvailability[] = [],
+  lotes: LoteAvailability[] = [],
 ): RegistrationSummaryStats {
   const totalStudents = registrations.reduce((acc, reg) => acc + reg.group_size, 0);
   const confirmedStudents = registrations
@@ -50,23 +64,53 @@ export function computeRegistrationStats(
 
   const totalMap = new Map<string, number>();
   const confirmedMap = new Map<string, number>();
+  const loteTotalMap = new Map<string, number>();
+  const loteConfirmedMap = new Map<string, number>();
 
   for (const reg of registrations) {
     accumulateBateriaCounts(reg, totalMap, confirmedMap);
+
+    if (reg.lote_id) {
+      loteTotalMap.set(reg.lote_id, (loteTotalMap.get(reg.lote_id) ?? 0) + 1);
+      if (reg.payment_status === "confirmed") {
+        loteConfirmedMap.set(reg.lote_id, (loteConfirmedMap.get(reg.lote_id) ?? 0) + 1);
+      }
+    }
   }
 
-  const bateriaStats: BateriaStats[] = baterias
+  const combinedMode = adventure.has_baterias && adventure.has_lotes;
+  const bateriaSource = combinedMode ? bateriasWithLotes : baterias;
+
+  const bateriaStats: BateriaStats[] = bateriaSource
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order)
-    .map((b) => ({
-      id: b.id,
-      label: b.label,
-      startTime: b.start_time,
-      endTime: b.end_time,
-      capacity: b.capacity,
-      sortOrder: b.sort_order,
-      total: totalMap.get(b.id) ?? 0,
-      confirmed: confirmedMap.get(b.id) ?? 0,
+    .map((b) => {
+      const combined = combinedMode ? (b as BateriaWithLoteAvailability) : null;
+      return {
+        id: b.id,
+        label: b.label,
+        startTime: b.start_time,
+        endTime: b.end_time,
+        capacity: combinedMode
+          ? combined?.active_lote_remaining ?? 0
+          : (b as BateriaAvailability).capacity,
+        sortOrder: b.sort_order,
+        total: totalMap.get(b.id) ?? 0,
+        confirmed: confirmedMap.get(b.id) ?? 0,
+        activeLoteLabel: combined?.active_lote_label ?? null,
+        activeLoteRemaining: combined?.active_lote_remaining,
+      };
+    });
+
+  const loteStats: LoteStats[] = lotes
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((lote) => ({
+      id: lote.id,
+      label: lote.label,
+      total: loteTotalMap.get(lote.id) ?? 0,
+      confirmed: loteConfirmedMap.get(lote.id) ?? 0,
+      capacity: lote.capacity,
     }));
 
   return {
@@ -74,6 +118,8 @@ export function computeRegistrationStats(
     confirmedStudents,
     maxParticipants: adventure.max_participants,
     hasBaterias: adventure.has_baterias,
+    hasLotes: adventure.has_lotes,
     baterias: bateriaStats,
+    lotes: loteStats,
   };
 }

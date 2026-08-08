@@ -163,22 +163,22 @@ function createEmptyCustomField(): CustomFieldFormValue {
   return { name: "", label: "", type: "text", required: false };
 }
 
-const bateriaSchema = z
-  .object({
-    id: z.string().uuid().optional(),
-    label: z.string().min(1, "Nome da bateria é obrigatório."),
-    start_time: z
-      .string()
-      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use formato HH:MM."),
-    end_time: z
-      .string()
-      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use formato HH:MM."),
-    capacity: z.coerce.number().int("Use um número inteiro.").min(1, "Capacidade mínima é 1."),
-  })
-  .refine((b) => b.end_time > b.start_time, {
-    message: "Horário final deve ser maior que o inicial.",
-    path: ["end_time"],
-  });
+const bateriaBaseSchema = z.object({
+  id: z.string().uuid().optional(),
+  label: z.string().min(1, "Nome da bateria é obrigatório."),
+  start_time: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use formato HH:MM."),
+  end_time: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use formato HH:MM."),
+  capacity: z.coerce.number().int("Use um número inteiro.").min(1, "Capacidade mínima é 1."),
+});
+
+const bateriaSchema = bateriaBaseSchema.refine((b) => b.end_time > b.start_time, {
+  message: "Horário final deve ser maior que o inicial.",
+  path: ["end_time"],
+});
 
 const loteSchema = z.object({
   id: z.string().uuid().optional(),
@@ -188,6 +188,15 @@ const loteSchema = z.object({
   price: z.coerce.number().min(0, "O preço não pode ser negativo."),
   pixCopiaECola: z.string().default(""),
 });
+
+const bateriaFormSchema = bateriaBaseSchema
+  .extend({
+    lotes: z.array(loteSchema).optional(),
+  })
+  .refine((b) => b.end_time > b.start_time, {
+    message: "Horário final deve ser maior que o inicial.",
+    path: ["end_time"],
+  });
 
 const adventureSchema = z
   .object({
@@ -218,7 +227,7 @@ const adventureSchema = z
     registrationsEnabled: z.boolean(),
     imageRightsEnabled: z.boolean(),
     hasBaterias: z.boolean(),
-    baterias: z.array(bateriaSchema).optional(),
+    baterias: z.array(bateriaFormSchema).optional(),
     hasLotes: z.boolean(),
     lotes: z.array(loteSchema).optional(),
     customFields: z
@@ -254,6 +263,8 @@ const adventureSchema = z
     pixInstructions: z.string().optional(),
   })
   .superRefine((data, ctx) => {
+    const combinedMode = data.hasLotes && data.hasBaterias;
+
     if (data.hasBaterias && (!data.baterias || data.baterias.length === 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -261,25 +272,32 @@ const adventureSchema = z
         path: ["baterias"],
       });
     }
-    if (data.hasLotes && (!data.lotes || data.lotes.length === 0)) {
+
+    if (data.hasLotes && !combinedMode && (!data.lotes || data.lotes.length === 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Adicione pelo menos um lote.",
         path: ["lotes"],
       });
     }
-    if (data.hasLotes && data.hasBaterias) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Lotes e baterias não podem estar ativos ao mesmo tempo.",
-        path: ["hasLotes"],
+
+    if (combinedMode) {
+      data.baterias?.forEach((bateria, index) => {
+        if (!bateria.lotes || bateria.lotes.length === 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Adicione pelo menos um lote nesta bateria.",
+            path: ["baterias", index, "lotes"],
+          });
+        }
       });
     }
-    if (
-      data.pixEnabled &&
-      data.hasLotes &&
-      data.lotes?.some((l) => !l.pixCopiaECola.trim())
-    ) {
+
+    const allLotes = combinedMode
+      ? (data.baterias ?? []).flatMap((bateria) => bateria.lotes ?? [])
+      : (data.lotes ?? []);
+
+    if (data.pixEnabled && data.hasLotes && allLotes.some((l) => !l.pixCopiaECola.trim())) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Cadastre o PIX de todos os lotes para ativar o pagamento.",
@@ -437,10 +455,18 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
 
   const pixEnabled = form.watch("pixEnabled");
   const hasLotes = form.watch("hasLotes");
+  const hasBaterias = form.watch("hasBaterias");
+  const combinedMode = hasLotes && hasBaterias;
   const pixCopiaECola = form.watch("pixCopiaECola");
   const lotesValues = form.watch("lotes") ?? [];
+  const bateriasValues = form.watch("baterias") ?? [];
+  const nestedLotesValues = combinedMode
+    ? bateriasValues.flatMap((bateria) => bateria.lotes ?? [])
+    : [];
   const registeredPixKeysCount = hasLotes
-    ? lotesValues.filter((l) => l.pixCopiaECola.trim().length > 0).length
+    ? combinedMode
+      ? nestedLotesValues.filter((l) => l.pixCopiaECola.trim().length > 0).length
+      : lotesValues.filter((l) => l.pixCopiaECola.trim().length > 0).length
     : Object.values(pixCopiaECola).filter((value) => value.trim().length > 0).length;
 
   const bateriasFieldArray = useFieldArray({
@@ -456,90 +482,123 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
   useEffect(() => {
     if (!adventure?.id) return;
     let cancelled = false;
-    async function load() {
-      const { data, error } = await supabase
-        .rpc("get_adventure_baterias_with_availability", { p_adventure_id: adventure!.id });
+
+    async function loadBateriasAndLotes() {
+      const [bateriasRes, lotesRes] = await Promise.all([
+        supabase.rpc("get_adventure_baterias_with_availability", { p_adventure_id: adventure!.id }),
+        supabase.rpc("get_adventure_lotes_with_availability", { p_adventure_id: adventure!.id }),
+      ]);
+
       if (cancelled) return;
-      if (error) {
-        console.error("Failed to load baterias:", error);
+
+      if (bateriasRes.error) {
+        console.error("Failed to load baterias:", bateriasRes.error);
+      } else {
+        const bateriasList = (bateriasRes.data ?? []) as BateriaAvailability[];
+        setBateriasAvailability(bateriasList);
+      }
+
+      if (lotesRes.error) {
+        console.error("Failed to load lotes:", lotesRes.error);
         return;
       }
-      const list = (data ?? []) as BateriaAvailability[];
-      setBateriasAvailability(list);
-      if (list.length > 0) {
+
+      const lotesList = (lotesRes.data ?? []) as LoteAvailability[];
+      setLotesAvailability(lotesList);
+
+      if (lotesList.length === 0) {
+        if ((bateriasRes.data ?? []).length > 0) {
+          form.setValue(
+            "baterias",
+            ((bateriasRes.data ?? []) as BateriaAvailability[]).map((b) => ({
+              id: b.id,
+              label: b.label,
+              start_time: b.start_time.slice(0, 5),
+              end_time: b.end_time.slice(0, 5),
+              capacity: b.capacity,
+              lotes: [],
+            })),
+            { shouldDirty: false }
+          );
+        }
+        return;
+      }
+
+      const { data: pixRows } = await supabase
+        .from("adventure_lotes")
+        .select("id, pix_copia_cola, bateria_id")
+        .eq("adventure_id", adventure!.id);
+
+      if (cancelled) return;
+
+      const pixById = Object.fromEntries(
+        (pixRows ?? []).map((row) => [row.id as string, (row.pix_copia_cola as string) ?? ""])
+      );
+
+      const mapLote = (l: LoteAvailability) => ({
+        id: l.id,
+        label: l.label,
+        sort_order: l.sort_order,
+        capacity: l.capacity,
+        price: Number(l.price),
+        pixCopiaECola: pixById[l.id] ?? "",
+      });
+
+      const isCombined = adventure!.has_baterias && adventure!.has_lotes;
+      const bateriasList = (bateriasRes.data ?? []) as BateriaAvailability[];
+
+      if (isCombined && bateriasList.length > 0) {
+        const lotesByBateria = new Map<string, ReturnType<typeof mapLote>[]>();
+        for (const lote of lotesList) {
+          if (!lote.bateria_id) continue;
+          const existing = lotesByBateria.get(lote.bateria_id) ?? [];
+          existing.push(mapLote(lote));
+          lotesByBateria.set(lote.bateria_id, existing);
+        }
+
         form.setValue(
           "baterias",
-          list.map((b) => ({
+          bateriasList.map((b) => ({
             id: b.id,
             label: b.label,
             start_time: b.start_time.slice(0, 5),
             end_time: b.end_time.slice(0, 5),
             capacity: b.capacity,
+            lotes: (lotesByBateria.get(b.id) ?? []).sort(
+              (a, b) => a.sort_order - b.sort_order
+            ),
           })),
           { shouldDirty: false }
         );
-      }
-    }
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [adventure?.id, supabase, form]);
-
-  useEffect(() => {
-    if (!adventure?.id) return;
-    let cancelled = false;
-    async function loadLotes() {
-      const { data, error } = await supabase
-        .rpc("get_adventure_lotes_with_availability", { p_adventure_id: adventure!.id });
-      if (cancelled) return;
-      if (error) {
-        console.error("Failed to load lotes:", error);
-        return;
-      }
-      const list = (data ?? []) as LoteAvailability[];
-      setLotesAvailability(list);
-      if (list.length > 0) {
-        form.setValue(
-          "lotes",
-          list.map((l) => ({
-            id: l.id,
-            label: l.label,
-            sort_order: l.sort_order,
-            capacity: l.capacity,
-            price: Number(l.price),
-            pixCopiaECola: "",
-          })),
-          { shouldDirty: false }
-        );
-        const { data: pixRows } = await supabase
-          .from("adventure_lotes")
-          .select("id, pix_copia_cola")
-          .eq("adventure_id", adventure!.id);
-        if (!cancelled && pixRows) {
-          const pixById = Object.fromEntries(
-            pixRows.map((row) => [row.id as string, (row.pix_copia_cola as string) ?? ""])
-          );
+        form.setValue("lotes", [], { shouldDirty: false });
+      } else if (!isCombined) {
+        if (bateriasList.length > 0) {
           form.setValue(
-            "lotes",
-            list.map((l) => ({
-              id: l.id,
-              label: l.label,
-              sort_order: l.sort_order,
-              capacity: l.capacity,
-              price: Number(l.price),
-              pixCopiaECola: pixById[l.id] ?? "",
+            "baterias",
+            bateriasList.map((b) => ({
+              id: b.id,
+              label: b.label,
+              start_time: b.start_time.slice(0, 5),
+              end_time: b.end_time.slice(0, 5),
+              capacity: b.capacity,
             })),
             { shouldDirty: false }
           );
         }
+
+        form.setValue(
+          "lotes",
+          lotesList.map(mapLote),
+          { shouldDirty: false }
+        );
       }
     }
-    void loadLotes();
+
+    void loadBateriasAndLotes();
     return () => {
       cancelled = true;
     };
-  }, [adventure?.id, supabase, form]);
+  }, [adventure?.id, adventure?.has_baterias, adventure?.has_lotes, supabase, form]);
 
   const { fields, append, insert, move, remove } = useFieldArray({
     control: form.control,
@@ -652,9 +711,14 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
 
   async function onSubmit(values: AdventureFormValues) {
     setIsSubmitting(true);
+    const isCombinedMode = values.hasLotes && values.hasBaterias;
 
-    if (values.hasLotes && values.lotes) {
-      for (const lote of values.lotes) {
+    const allLotesForValidation = isCombinedMode
+      ? (values.baterias ?? []).flatMap((bateria) => bateria.lotes ?? [])
+      : (values.lotes ?? []);
+
+    if (values.hasLotes && allLotesForValidation.length > 0) {
+      for (const lote of allLotesForValidation) {
         if (!lote.id) continue;
         const existing = lotesAvailability.find((l) => l.id === lote.id);
         if (!existing) continue;
@@ -670,8 +734,8 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
       }
     }
 
-    // 1) Validação pre-submit de redução de capacidade abaixo do reservado
-    if (values.hasBaterias && values.baterias) {
+    // Validação pre-submit de redução de capacidade abaixo do reservado (só modo baterias sem lotes)
+    if (values.hasBaterias && !isCombinedMode && values.baterias) {
       for (const bateria of values.baterias) {
         if (!bateria.id) continue;
         const existing = bateriasAvailability.find((b) => b.id === bateria.id);
@@ -761,7 +825,9 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
         label: b.label,
         start_time: b.start_time,
         end_time: b.end_time,
-        capacity: b.capacity,
+        capacity: isCombinedMode
+          ? (b.lotes ?? []).reduce((sum, lote) => sum + lote.capacity, 0) || 1
+          : b.capacity,
         sort_order: index,
       }));
 
@@ -781,14 +847,44 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
         return;
       }
 
-      const lotesPayload = (values.lotes ?? []).map((l, index) => ({
-        id: l.id,
-        label: l.label,
-        sort_order: index,
-        capacity: l.capacity,
-        price: l.price,
-        pix_copia_cola: l.pixCopiaECola,
-      }));
+      let bateriaIdsByIndex: string[] = [];
+      if (isCombinedMode) {
+        const { data: savedBaterias, error: reloadError } = await supabase.rpc(
+          "get_adventure_baterias_with_availability",
+          { p_adventure_id: adventureId }
+        );
+        if (reloadError) {
+          toast({
+            title: "Falha ao salvar lotes",
+            description: "Não foi possível vincular lotes às baterias. Tente novamente.",
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        bateriaIdsByIndex = ((savedBaterias ?? []) as BateriaAvailability[]).map((b) => b.id);
+      }
+
+      const lotesPayload = isCombinedMode
+        ? (values.baterias ?? []).flatMap((bateria, bateriaIndex) =>
+            (bateria.lotes ?? []).map((lote, loteIndex) => ({
+              id: lote.id,
+              label: lote.label,
+              sort_order: loteIndex,
+              capacity: lote.capacity,
+              price: lote.price,
+              pix_copia_cola: lote.pixCopiaECola,
+              bateria_id: bateria.id ?? bateriaIdsByIndex[bateriaIndex],
+            }))
+          )
+        : (values.lotes ?? []).map((l, index) => ({
+            id: l.id,
+            label: l.label,
+            sort_order: index,
+            capacity: l.capacity,
+            price: l.price,
+            pix_copia_cola: l.pixCopiaECola,
+          }));
 
       const { error: loteError } = await supabase.rpc("save_adventure_lotes", {
         p_adventure_id: adventureId,
@@ -973,7 +1069,9 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                     </FormControl>
                     <FormDescription>
                       {hasLotesEnabled
-                        ? "Não usado quando lotes estão ativos — a capacidade é a soma das vagas dos lotes."
+                        ? combinedMode
+                          ? "Não usado no modo baterias + lotes — a capacidade é definida pelos lotes de cada bateria."
+                          : "Não usado quando lotes estão ativos — a capacidade é a soma das vagas dos lotes."
                         : hasBaterias
                           ? "Não usado quando baterias estão ativas — a capacidade é definida por bateria."
                           : "Define quantas pessoas, no total, podem participar desta aventura."}
@@ -1123,7 +1221,6 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                     <Switch
                       checked={field.value}
                       onCheckedChange={field.onChange}
-                      disabled={form.watch("hasLotes")}
                     />
                   </FormControl>
                 </FormItem>
@@ -1144,7 +1241,6 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                     <Switch
                       checked={field.value}
                       onCheckedChange={field.onChange}
-                      disabled={form.watch("hasBaterias")}
                     />
                   </FormControl>
                 </FormItem>
@@ -1153,7 +1249,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
           </div>
         </div>
 
-        {form.watch("hasLotes") && (
+        {form.watch("hasLotes") && !form.watch("hasBaterias") && (
           <div className="space-y-3 rounded-md border p-4 bg-muted/20">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold">Lotes</h4>
@@ -1287,7 +1383,9 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
         {form.watch("hasBaterias") && (
           <div className="space-y-3 rounded-md border p-4 bg-muted/20">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold">Baterias</h4>
+              <h4 className="text-sm font-semibold">
+                {combinedMode ? "Baterias e Lotes" : "Baterias"}
+              </h4>
               <Button
                 type="button"
                 variant="outline"
@@ -1298,7 +1396,20 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
                     label: `Bateria ${next}`,
                     start_time: "08:00",
                     end_time: "10:00",
-                    capacity: 10,
+                    capacity: combinedMode ? 1 : 10,
+                    ...(combinedMode
+                      ? {
+                          lotes: [
+                            {
+                              label: "Lote 1",
+                              sort_order: 0,
+                              capacity: 10,
+                              price: 0,
+                              pixCopiaECola: "",
+                            },
+                          ],
+                        }
+                      : {}),
                   });
                 }}
               >
@@ -1310,6 +1421,237 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
               <p className="text-xs text-muted-foreground">
                 Nenhuma bateria configurada. Adicione pelo menos uma.
               </p>
+            ) : combinedMode ? (
+              <div className="space-y-6">
+                {bateriasFieldArray.fields.map((field, bateriaIndex) => (
+                  <div key={field.id} className="rounded-md border p-4 space-y-4 bg-background">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold">Bateria #{bateriaIndex + 1}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={async () => {
+                          const baterias = form.getValues("baterias") ?? [];
+                          const current = baterias[bateriaIndex];
+                          if (current?.id) {
+                            const { error } = await supabase.rpc("delete_adventure_bateria", {
+                              p_bateria_id: current.id,
+                            });
+                            if (error) {
+                              const message = String(error.message || "");
+                              if (message.includes("BATERIA_HAS_REGISTRATIONS")) {
+                                toast({
+                                  title: "Bateria com inscrições",
+                                  description:
+                                    "Não é possível remover uma bateria com inscrições. Cancele as inscrições primeiro.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              toast({
+                                title: "Falha ao remover",
+                                description: "Algo deu errado. Tente novamente.",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                          }
+                          bateriasFieldArray.remove(bateriaIndex);
+                          setBateriasAvailability((prev) =>
+                            prev.filter((b) => b.id !== current?.id)
+                          );
+                        }}
+                      >
+                        <Trash className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name={`baterias.${bateriaIndex}.label`}
+                        render={({ field: f }) => (
+                          <FormItem>
+                            <FormLabel>Nome</FormLabel>
+                            <FormControl>
+                              <Input {...f} placeholder="ex: 07:00" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`baterias.${bateriaIndex}.start_time`}
+                        render={({ field: f }) => (
+                          <FormItem>
+                            <FormLabel>Início</FormLabel>
+                            <FormControl>
+                              <Input {...f} placeholder="07:00" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`baterias.${bateriaIndex}.end_time`}
+                        render={({ field: f }) => (
+                          <FormItem>
+                            <FormLabel>Fim</FormLabel>
+                            <FormControl>
+                              <Input {...f} placeholder="10:00" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="space-y-3 border-t pt-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium">Lotes desta bateria</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const currentLotes =
+                              form.getValues(`baterias.${bateriaIndex}.lotes`) ?? [];
+                            const next = currentLotes.length + 1;
+                            form.setValue(`baterias.${bateriaIndex}.lotes`, [
+                              ...currentLotes,
+                              {
+                                label: `Lote ${next}`,
+                                sort_order: next - 1,
+                                capacity: 10,
+                                price: 0,
+                                pixCopiaECola: "",
+                              },
+                            ]);
+                          }}
+                        >
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          Adicionar Lote
+                        </Button>
+                      </div>
+                      {(form.watch(`baterias.${bateriaIndex}.lotes`) ?? []).map(
+                        (_lote, loteIndex) => (
+                          <div
+                            key={`${field.id}-lote-${loteIndex}`}
+                            className="rounded-md border p-3 space-y-3 bg-muted/20"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-muted-foreground">
+                                Lote #{loteIndex + 1}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  const currentLotes =
+                                    form.getValues(`baterias.${bateriaIndex}.lotes`) ?? [];
+                                  const current = currentLotes[loteIndex];
+                                  if (current?.id) {
+                                    const existing = lotesAvailability.find(
+                                      (l) => l.id === current.id
+                                    );
+                                    if (existing && existing.reserved > 0) {
+                                      toast({
+                                        title: "Não é possível remover",
+                                        description: "Este lote tem inscrições ativas.",
+                                        variant: "destructive",
+                                      });
+                                      return;
+                                    }
+                                  }
+                                  form.setValue(
+                                    `baterias.${bateriaIndex}.lotes`,
+                                    currentLotes.filter((_, i) => i !== loteIndex)
+                                  );
+                                }}
+                              >
+                                <Trash className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <FormField
+                                control={form.control}
+                                name={`baterias.${bateriaIndex}.lotes.${loteIndex}.label`}
+                                render={({ field: f }) => (
+                                  <FormItem>
+                                    <FormLabel>Nome</FormLabel>
+                                    <FormControl>
+                                      <Input {...f} placeholder="ex: Lote 1" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name={`baterias.${bateriaIndex}.lotes.${loteIndex}.capacity`}
+                                render={({ field: f }) => (
+                                  <FormItem>
+                                    <FormLabel>Vagas</FormLabel>
+                                    <FormControl>
+                                      <Input type="number" min="1" {...f} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name={`baterias.${bateriaIndex}.lotes.${loteIndex}.price`}
+                                render={({ field: f }) => (
+                                  <FormItem>
+                                    <FormLabel>Preço (R$)</FormLabel>
+                                    <FormControl>
+                                      <Input type="number" step="0.01" min="0" {...f} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <FormField
+                              control={form.control}
+                              name={`baterias.${bateriaIndex}.lotes.${loteIndex}.pixCopiaECola`}
+                              render={({ field: f }) => (
+                                <FormItem>
+                                  <FormLabel>PIX copia-e-cola</FormLabel>
+                                  <FormControl>
+                                    <LotePixField
+                                      label={
+                                        form.watch(
+                                          `baterias.${bateriaIndex}.lotes.${loteIndex}.label`
+                                        ) || `Lote ${loteIndex + 1}`
+                                      }
+                                      value={f.value ?? ""}
+                                      onChange={f.onChange}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        )
+                      )}
+                      <FormField
+                        control={form.control}
+                        name={`baterias.${bateriaIndex}.lotes`}
+                        render={() => (
+                          <FormItem>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <Table>
                 <TableHeader>
@@ -1446,7 +1788,7 @@ export function AdventureForm({ adventure }: AdventureFormProps) {
           pixEnabled={pixEnabled}
           registeredKeysCount={registeredPixKeysCount}
           hasLotes={hasLotes}
-          totalLotesCount={lotesValues.length}
+          totalLotesCount={combinedMode ? nestedLotesValues.length : lotesValues.length}
         />
         <FormField
           control={form.control}
