@@ -8,7 +8,7 @@ import { AdventureCard } from '@/components/adventure-card';
 import { ArrowRight, Mountain } from 'lucide-react';
 import { useCollection } from '@/supabase/use-collection';
 import { useSupabase } from '@/supabase/hooks';
-import type { ActiveLote } from '@/lib/types';
+import { getAdventureListPrice } from '@/lib/adventure-list-price';
 import { useDoc } from '@/supabase/use-doc';
 import type { Adventure, HomePageContent } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -53,7 +53,11 @@ function EmptyState() {
 
 export default function Home() {
   const supabase = useSupabase();
-  const { data: adventures, isLoading: isLoadingAdventures } = useCollection<Adventure>('adventures');
+  const { data: adventures, isLoading: isLoadingAdventures } = useCollection<Adventure>('adventures', {
+    filters: [{ column: 'is_enabled', operator: 'eq', value: true }],
+  });
+  // Filtro no cliente: realtime do useCollection não reaplica filters.
+  const enabledAdventures = (adventures ?? []).filter((adventure) => adventure.is_enabled);
   const { data: homePageDoc, isLoading: isLoadingContent } = useDoc<{ data: HomePageContent }>('content', 'homepage');
   const homePageContent = homePageDoc?.data ?? null;
   const { setTransparent } = useHeaderTransparent();
@@ -69,13 +73,11 @@ export default function Home() {
     let cancelled = false;
 
     async function loadPrices() {
-      const list = adventures ?? [];
+      const list = (adventures ?? []).filter((adventure) => adventure.is_enabled);
       const entries = await Promise.all(
         list.map(async (adv) => {
-          if (!adv.has_lotes) return [adv.id, adv.price] as const;
-          const { data } = await supabase.rpc('get_active_lote', { p_adventure_id: adv.id });
-          const lote = data?.[0] as ActiveLote | undefined;
-          return [adv.id, lote ? Number(lote.price) : null] as const;
+          const price = await getAdventureListPrice(supabase, adv);
+          return [adv.id, price] as const;
         })
       );
       if (!cancelled) {
@@ -153,10 +155,10 @@ export default function Home() {
             </p>
           </div>
           {isLoadingAdventures && <AdventuresLoading />}
-          {adventures && adventures.length === 0 && <EmptyState />}
-          {adventures && adventures.length > 0 && (
+          {!isLoadingAdventures && enabledAdventures.length === 0 && <EmptyState />}
+          {!isLoadingAdventures && enabledAdventures.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {adventures.map((adventure) => (
+              {enabledAdventures.map((adventure) => (
                 <AdventureCard
                   key={adventure.id}
                   adventure={adventure}

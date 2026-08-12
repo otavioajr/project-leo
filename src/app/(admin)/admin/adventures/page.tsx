@@ -29,7 +29,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCollection } from "@/supabase/use-collection";
 import { useSupabase } from "@/supabase/hooks";
-import type { ActiveLote, Adventure } from "@/lib/types";
+import { getAdventureListPrice } from "@/lib/adventure-list-price";
+import type { Adventure } from "@/lib/types";
 
 export default function AdventuresPage() {
   const supabase = useSupabase();
@@ -44,10 +45,8 @@ export default function AdventuresPage() {
       const list = adventures ?? [];
       const entries = await Promise.all(
         list.map(async (adv) => {
-          if (!adv.has_lotes) return [adv.id, adv.price] as const;
-          const { data } = await supabase.rpc('get_active_lote', { p_adventure_id: adv.id });
-          const lote = data?.[0] as ActiveLote | undefined;
-          return [adv.id, lote ? Number(lote.price) : null] as const;
+          const price = await getAdventureListPrice(supabase, adv);
+          return [adv.id, price] as const;
         })
       );
       if (!cancelled) {
